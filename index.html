@@ -1,0 +1,270 @@
+فهمیدم! به ترتیب عکسی که فرستادی:
+
+1. **انسان‌ها** `humans`
+2. **الف‌ها** `elves`
+3. **دورف‌ها** `dwarves`
+4. **نیمه‌دراگون‌ها** `dragons`
+5. **فرشته‌ها** `angels`
+6. **اجین‌ها** `ajins`
+7. **شیاطین** `demons`
+
+من کلا سیستمو عوض کردم که به جای رنگ ساده، **عکس خود قلمرو رو داخل هگز clip کنه**. اگر عکس لود نشد برمیگرده به رنگ قبلی.
+
+### چیکار باید بکنی؟
+1.  7 تا عکس رو با همین اسم کنار فایل `html` ذخیره کن:
+`humans.jpg, elves.jpg, dwarves.jpg, dragons.jpg, angels.jpg, ajins.jpg, demons.jpg`
+2. کد پایین رو جایگزین کد قبلیت کن. میتونی اسم فایل ها رو توی بخش `IMAGE_URLS` عوض کنی.
+
+اگر بخوای همه عکسها base64 بشن داخل خود کد، بگو تا برات همون کار رو هم بکنم.
+
+این کد نهایی با نقشه واقعی:
+
+```html
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Eldoria - Real Maps</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#101218; font-family:Tahoma, Arial, sans-serif; color:white; }
+  canvas#game { position:fixed; inset:0; width:100vw; height:100vh; display:block; background:#0e1016; }
+  #hud { position:fixed; top:12px; right:12px; width:min(340px, calc(100vw - 24px)); padding:12px 14px; border-radius:16px; background:rgba(0,0,0,0.55); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.12); font-size:13px; line-height:1.9; z-index:10; }
+  #hud strong { color:#ffd36a; }
+  #minimapWrap { position:fixed; top:12px; left:12px; z-index:10; background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:6px; backdrop-filter:blur(8px); }
+  #minimap { display:block; width:150px; height:140px; border-radius:10px; }
+  #minimapTitle { font-size:11px; text-align:center; color:rgba(255,255,255,0.7); margin-bottom:4px; }
+  #joystick { position:fixed; left:22px; bottom:22px; width:138px; height:138px; border-radius:50%; background:rgba(255,255,255,0.12); border:2px solid rgba(255,255,255,0.2); backdrop-filter:blur(8px); z-index:20; touch-action:none; }
+  #knob { position:absolute; left:50%; top:50%; width:62px; height:62px; transform:translate(-50%,-50%); border-radius:50%; background:rgba(255,255,255,0.75); box-shadow:0 8px 22px rgba(0,0,0,0.35); }
+  #buttons { position:fixed; right:12px; bottom:14px; display:flex; gap:8px; z-index:20; flex-wrap:wrap; justify-content:flex-end; max-width:240px; }
+  button { border:0; border-radius:14px; padding:10px 12px; color:white; background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.15); backdrop-filter:blur(8px); font-family:inherit; font-size:12.5px; }
+  #toasts { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:30; display:flex; flex-direction:column; gap:6px; align-items:center; pointer-events:none; }
+  .toast { background:rgba(0,0,0,0.75); border:1px solid rgba(255,211,106,0.4); color:#ffd36a; padding:8px 16px; border-radius:999px; font-size:13px; opacity:0; transform:translateY(-10px); transition:all .35s ease; white-space:nowrap; }
+  .toast.show { opacity:1; transform:translateY(0); }
+  #settingsPanel { position:fixed; right:12px; bottom:80px; z-index:25; background:rgba(0,0,0,0.75); border:1px solid rgba(255,255,255,0.15); border-radius:14px; padding:12px 14px; font-size:12.5px; display:none; min-width:200px; backdrop-filter:blur(10px); }
+  #settingsPanel.open { display:block; }
+  #settingsPanel label { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:7px 0; }
+  #loading { position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; background:#101218; color:#ffd36a; font-size:14px; }
+  #fps { position:fixed; left:12px; bottom:12px; z-index:10; font-size:11px; color:rgba(255,255,255,0.5); display:none; }
+  #compass { position:fixed; top:170px; left:12px; z-index:10; font-size:20px; background:rgba(0,0,0,0.4); border-radius:50%; width:38px; height:38px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,0.15); }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+<div id="loading">در حال بارگذاری نقشه‌های واقعی... <span id="loadPercent"></span></div>
+
+<div id="minimapWrap"><div id="minimapTitle">نقشه جهان</div><canvas id="minimap"></canvas></div>
+<div id="compass">🧭</div>
+<div id="hud">
+  <div>منطقه فعلی: <strong id="regionName">---</strong></div>
+  <div>نزدیک‌ترین شهر: <strong id="nearName">---</strong></div>
+  <div>مختصات: <strong id="coords">0, 0</strong></div>
+  <div id="hint" style="margin-top:6px;color:rgba(255,255,255,0.6);font-size:11px">جوی‌استیک / WASD</div>
+</div>
+<div id="toasts"></div>
+<div id="joystick"><div id="knob"></div></div>
+<div id="buttons">
+  <button id="zoomIn">زوم +</button>
+  <button id="zoomOut">زوم -</button>
+  <button id="reset">اسپان</button>
+  <button id="settingsBtn">⚙️ تنظیمات</button>
+</div>
+<div id="settingsPanel">
+  <label><span>نقشه‌های واقعی</span><input type="checkbox" id="chkReal" checked /></label>
+  <label><span>نمایش گرید</span><input type="checkbox" id="chkGrid" /></label>
+  <label><span>مینی‌مپ</span><input type="checkbox" id="chkMinimap" checked /></label>
+  <label><span>ردپا</span><input type="checkbox" id="chkTrail" checked /></label>
+  <label><span>صدا</span><input type="checkbox" id="chkSound" checked /></label>
+  <label><span>FPS</span><input type="checkbox" id="chkFps" /></label>
+</div>
+<div id="fps">FPS: 0</div>
+
+<script>
+// ---- عکس ها رو اینجا آدرس بده ----
+// همین 7 عکس که فرستادی رو با این اسم ها ذخیره کن کنار html
+const IMAGE_URLS = {
+  humans: './humans.jpg',   // عکس 1 : شهر والور
+  elves: './elves.jpg',     // عکس 2 : ایلیاندر
+  dwarves: './dwarves.jpg', // عکس 3 : آلکسان / کوهستان
+  dragons: './dragons.jpg', // عکس 4 : آستلارین
+  angels: './angels.jpg',   // عکس 5 : سینکتوری نور
+  ajins: './ajins.jpg',     // عکس 6 : ویندور
+  demons: './demons.jpg'    // عکس 7 : Vorthak
+};
+
+const settings = { showGrid:false, showMinimap:true, showTrail:true, sound:true, showFps:false, showReal:true };
+const canvas = document.getElementById('game'); const ctx = canvas.getContext('2d');
+const mmCanvas = document.getElementById('minimap'); const mmCtx = mmCanvas.getContext('2d');
+const regionNameEl = document.getElementById('regionName'); const nearNameEl = document.getElementById('nearName');
+const coordsEl = document.getElementById('coords'); const fpsEl = document.getElementById('fps'); const compassEl = document.getElementById('compass');
+const toastsEl = document.getElementById('toasts'); const loadEl = document.getElementById('loading'); const loadPercent = document.getElementById('loadPercent');
+let W=0,H=0,DPR=1;
+function resize(){ DPR=Math.max(1,Math.min(2,devicePixelRatio||1)); W=innerWidth; H=innerHeight; canvas.width=Math.floor(W*DPR); canvas.height=Math.floor(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0); const mmW=150,mmH=140; mmCanvas.width=mmW*DPR; mmCanvas.height=mmH*DPR; mmCanvas.style.width=mmW+'px'; mmCanvas.style.height=mmH+'px'; mmCtx.setTransform(DPR,0,0,DPR,0,0); }
+addEventListener('resize',resize); resize();
+
+// صدا و toast
+let audioCtx=null; function ensureAudio(){ if(!audioCtx)try{audioCtx=new (AudioContext||webkitAudioContext)()}catch(e){} }
+function playBeep(f=520,d=0.14,v=0.05){ if(!settings.sound||!audioCtx)return; const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.frequency.value=f; g.gain.value=v; o.connect(g); g.connect(audioCtx.destination); o.start(); g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+d); o.stop(audioCtx.currentTime+d); }
+addEventListener('pointerdown',ensureAudio,{once:true}); addEventListener('keydown',ensureAudio,{once:true});
+function showToast(t){ const el=document.createElement('div'); el.className='toast'; el.textContent=t; toastsEl.appendChild(el); requestAnimationFrame(()=>el.classList.add('show')); setTimeout(()=>{el.classList.remove('show'); setTimeout(()=>el.remove(),400)},2400); }
+
+// هندسه
+const HEX_R=430; const SQRT3=Math.sqrt(3);
+function axialToWorld(q,r){ return {x:HEX_R*1.5*q, y:HEX_R*SQRT3*(r+q/2)}; }
+function hexPoints(cx,cy,r){ const pts=[]; for(let i=0;i<6;i++){ const a=Math.PI/180*(60*i); pts.push({x:cx+r*Math.cos(a), y:cy+r*Math.sin(a)});} return pts; }
+function pointInPolygon(px,py,poly){ let inside=false; for(let i=0,j=poly.length-1;i<poly.length;j=i++){ const xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y; const inter=((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/((yj-yi)||0.00001)+xi); if(inter)inside=!inside;} return inside; }
+
+// داده مناطق - اسم ها مطابق عکس هایی که فرستادی آپدیت شد
+const regionData = [
+  { id:'angels', fa:'پادشاهی فرشته‌ها', en:'Celestia', q:0, r:-1, color:'#eef6ff', border:'#8fd3ff', text:'#26384f', capital:'سینکتوری نور',
+    points:[['استلار','N'],['آلیور','E'],['السیار','S'],['السکین','W'],['الزیروم','NE'],['اسیاران','SE']] },
+  { id:'ajins', fa:'پادشاهی اجین‌ها', en:'Zephyria', q:-1, r:0, color:'#dcf1ff', border:'#74c6e8', text:'#183347', capital:'ویندور',
+    points:[['ابرشهر','NE'],['تندباد','W'],['بادبان‌شهر','SW'],['صخره حرارتی','S'],['خندق طوفان','SE'],['چهارراه هوا','C']] },
+  { id:'dwarves', fa:'پادشاهی دورف‌ها', en:'Khazardun', q:1, r:-1, color:'#ded7c8', border:'#a88b56', text:'#3c2e1b', capital:'آلکسان',
+    points:[['ارفملیس','N'],['ورسوس','W'],['آلستیاس','SW'],['انکالیر','S'],['انسیلار','SE'],['الدکالیر','E']] },
+  { id:'demons', fa:'قلمرو شیاطین', en:'Demon Wastes', q:0, r:0, color:'#3b1d26', border:'#ff4b62', text:'#ffd6d6', capital:'Vorthak',
+    points:[['Zulmorth','N'],['Kraevok','NE'],['Nytheris','E'],['Dravokh','SE'],['Xulthar','S'],['Morvex','SW'],['Thalgrun','W'],['Veskarn','NW']] },
+  { id:'dragons', fa:'پادشاهی نیمه‌دراگون‌ها', en:'Drakfort', q:-1, r:1, color:'#4e2718', border:'#ff7a45', text:'#ffe0c7', capital:'آستلارین',
+    points:[['آلستون','N'],['ارمیاسا','NE'],['اسپارا','E'],['اندریال','SE'],['آلکسان','S'],['الدکالیر','W']] },
+  { id:'humans', fa:'پادشاهی انسان‌ها', en:'Valoria', q:1, r:0, color:'#dcefc4', border:'#77b255', text:'#253b20', capital:'شهر والور',
+    points:[['دژ طلایه‌دار','NW'],['دروازه تجارت','N'],['دشت‌های طلایی','E'],['لبه سبز','SW'],['بندرگاه امید','S'],['تقاطع شاهان','SE']] },
+  { id:'elves', fa:'پادشاهی الف‌ها', en:'Sylvanor', q:0, r:1, color:'#c2eec2', border:'#43b56b', text:'#14361d', capital:'ایلیاندر',
+    points:[['تورن‌فال','N'],['نیلوفریا','NE'],['آرلیندا','E'],['وایلدهارت','S'],['وودن‌هال','SW'],['دراک سیل','W']] }
+];
+const links = [['demons','angels'],['demons','ajins'],['demons','dwarves'],['demons','dragons'],['demons','humans'],['demons','elves'],['humans','dwarves'],['humans','elves'],['dragons','ajins'],['dragons','elves'],['angels','ajins'],['angels','dwarves']];
+const regions = regionData.map(r=>{ const p=axialToWorld(r.q,r.r); return {...r, x:p.x, y:p.y, polygon:hexPoints(p.x,p.y,HEX_R), img:null, imgLoaded:false}; });
+function dirOffset(dir){ const k=HEX_R*0.58; const map={ C:[0,0], N:[0,-k], S:[0,k], E:[k,0], W:[-k,0], NE:[k*0.55,-k*0.72], NW:[-k*0.55,-k*0.72], SE:[k*0.55,k*0.72], SW:[-k*0.55,k*0.72]}; return map[dir]||[0,0]; }
+const settlements=[]; for(const reg of regions){ settlements.push({name:reg.capital,type:'capital',regionId:reg.id,x:reg.x,y:reg.y}); for(const [name,dir] of reg.points){ const [ox,oy]=dirOffset(dir); settlements.push({name,type:'city',regionId:reg.id,x:reg.x+ox,y:reg.y+oy}); } }
+
+// لود عکس ها
+let loadedCount=0;
+function updateLoad(){ loadPercent.textContent = ` ${loadedCount}/${regions.length}`; if(loadedCount>=regions.length){ setTimeout(()=>loadEl.style.display='none',500);} }
+for(const reg of regions){
+  const src = IMAGE_URLS[reg.id];
+  if(!src) { loadedCount++; updateLoad(); continue; }
+  const img = new Image(); img.crossOrigin='anonymous'; img.src=src;
+  img.onload=()=>{ reg.imgLoaded=true; loadedCount++; updateLoad(); };
+  img.onerror=()=>{ console.warn('image fail',reg.id); loadedCount++; updateLoad(); };
+  reg.img=img;
+}
+updateLoad();
+
+// بازیکن
+const humansRegion = regions.find(r=>r.id==='humans'); const spawn={x:humansRegion.x,y:humansRegion.y};
+const player={x:spawn.x,y:spawn.y,radius:16,speed:210,moving:false,animPhase:0,facing:{x:0,y:1}};
+function getRegionAt(x,y){ for(const reg of regions) if(pointInPolygon(x,y,reg.polygon)) return reg; return null;}
+const camera={x:player.x,y:player.y,zoom:0.72}; let currentRegionId=getRegionAt(player.x,player.y)?.id||null; const playerTrail=[];
+const input={joyX:0,joyY:0,keyX:0,keyY:0}; const keys=new Set();
+addEventListener('keydown',e=>{keys.add(e.key.toLowerCase()); updateKeyboard();}); addEventListener('keyup',e=>{keys.delete(e.key.toLowerCase()); updateKeyboard();});
+function updateKeyboard(){ let x=0,y=0; if(keys.has('arrowleft')||keys.has('a'))x-=1; if(keys.has('arrowright')||keys.has('d'))x+=1; if(keys.has('arrowup')||keys.has('w'))y-=1; if(keys.has('arrowdown')||keys.has('s'))y+=1; const l=Math.hypot(x,y); if(l>0){x/=l; y/=l;} input.keyX=x; input.keyY=y; }
+const joystick=document.getElementById('joystick'), knob=document.getElementById('knob'); let joyActive=false, joyPointerId=null;
+joystick.addEventListener('pointerdown',e=>{joyActive=true; joyPointerId=e.pointerId; joystick.setPointerCapture(e.pointerId); updateJoystick(e);});
+joystick.addEventListener('pointermove',e=>{ if(joyActive&&e.pointerId===joyPointerId)updateJoystick(e); }); joystick.addEventListener('pointerup',endJoystick); joystick.addEventListener('pointercancel',endJoystick);
+function updateJoystick(e){ const rect=joystick.getBoundingClientRect(); const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2; let dx=e.clientX-cx, dy=e.clientY-cy; const max=rect.width*0.34, len=Math.hypot(dx,dy); if(len>max){dx=dx/len*max; dy=dy/len*max;} knob.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; input.joyX=dx/max; input.joyY=dy/max; }
+function endJoystick(e){ if(e.pointerId!==joyPointerId)return; joyActive=false; joyPointerId=null; input.joyX=0; input.joyY=0; knob.style.transform='translate(-50%,-50%)'; }
+document.getElementById('reset').onclick=()=>{player.x=spawn.x; player.y=spawn.y;};
+document.getElementById('zoomIn').onclick=()=>{camera.zoom=Math.min(1.5,camera.zoom+0.12);}; document.getElementById('zoomOut').onclick=()=>{camera.zoom=Math.max(0.35,camera.zoom-0.12);};
+const settingsBtn=document.getElementById('settingsBtn'), settingsPanel=document.getElementById('settingsPanel');
+settingsBtn.onclick=()=>settingsPanel.classList.toggle('open');
+document.getElementById('chkGrid').onchange=e=>settings.showGrid=e.target.checked;
+document.getElementById('chkMinimap').onchange=e=>{settings.showMinimap=e.target.checked; document.getElementById('minimapWrap').style.display=e.target.checked?'block':'none';};
+document.getElementById('chkTrail').onchange=e=>settings.showTrail=e.target.checked;
+document.getElementById('chkSound').onchange=e=>settings.sound=e.target.checked;
+document.getElementById('chkFps').onchange=e=>{settings.showFps=e.target.checked; fpsEl.style.display=e.target.checked?'block':'none';};
+document.getElementById('chkReal').onchange=e=>settings.showReal=e.target.checked;
+
+function worldToScreen(x,y){ return {x:(x-camera.x)*camera.zoom+W/2, y:(y-camera.y)*camera.zoom+H/2}; }
+function canMoveTo(x,y){ return !!getRegionAt(x,y); }
+function nearestSettlement(x,y){ let best=null,bestDist=Infinity; for(const p of settlements){ const d=Math.hypot(p.x-x,p.y-y); if(d<bestDist){bestDist=d; best=p;}} return {point:best,distance:bestDist}; }
+
+function drawPolygon(poly, fill, stroke, lw=4){ ctx.beginPath(); const f=worldToScreen(poly[0].x,poly[0].y); ctx.moveTo(f.x,f.y); for(let i=1;i<poly.length;i++){ const p=worldToScreen(poly[i].x,poly[i].y); ctx.lineTo(p.x,p.y);} ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke(); }
+function drawText(text,x,y,size,color,weight='bold'){ const s=worldToScreen(x,y); ctx.save(); ctx.direction='rtl'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font=`${weight} ${size*camera.zoom}px Tahoma, Arial`; ctx.lineWidth=5; ctx.strokeStyle='rgba(0,0,0,0.7)'; ctx.strokeText(text,s.x,s.y); ctx.fillStyle=color; ctx.fillText(text,s.x,s.y); ctx.restore(); }
+
+function drawClippedImage(reg){
+  if(!settings.showReal || !reg.img || !reg.imgLoaded) return false;
+  ctx.save();
+  ctx.beginPath(); const first=worldToScreen(reg.polygon[0].x,reg.polygon[0].y); ctx.moveTo(first.x,first.y);
+  for(let i=1;i<reg.polygon.length;i++){ const p=worldToScreen(reg.polygon[i].x,reg.polygon[i].y); ctx.lineTo(p.x,p.y);} ctx.closePath(); ctx.clip();
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const pt of reg.polygon){ const s=worldToScreen(pt.x,pt.y); minX=Math.min(minX,s.x); maxX=Math.max(maxX,s.x); minY=Math.min(minY,s.y); maxY=Math.max(maxY,s.y); }
+  const w=maxX-minX, h=maxY-minY; const img=reg.img; const ir=img.naturalWidth/img.naturalHeight; const br=w/h;
+  let dw,dh,dx,dy; if(ir>br){ dh=h; dw=dh*ir; dx=minX-(dw-w)/2; dy=minY; } else { dw=w; dh=dw/ir; dx=minX; dy=minY-(dh-h)/2; }
+  ctx.drawImage(img,dx,dy,dw,dh);
+  const grad=ctx.createRadialGradient((minX+maxX)/2,(minY+maxY)/2,w*0.2,(minX+maxX)/2,(minY+maxY)/2,w*0.9);
+  grad.addColorStop(0,'rgba(0,0,0,0)'); grad.addColorStop(1,'rgba(0,0,0,0.45)'); ctx.fillStyle=grad; ctx.fillRect(minX,minY,w,h);
+  ctx.restore(); return true;
+}
+
+function drawRegions(){
+  for(const reg of regions){ const shifted=reg.polygon.map(p=>({x:p.x+10,y:p.y+18})); drawPolygon(shifted,'rgba(0,0,0,0.22)','rgba(0,0,0,0)',0); }
+  for(const reg of regions){
+    const hasImg = drawClippedImage(reg);
+    if(!hasImg) drawPolygon(reg.polygon, reg.color, reg.border, 5);
+    else { // فقط border
+      ctx.beginPath(); const f=worldToScreen(reg.polygon[0].x,reg.polygon[0].y); ctx.moveTo(f.x,f.y);
+      for(let i=1;i<reg.polygon.length;i++){ const p=worldToScreen(reg.polygon[i].x,reg.polygon[i].y); ctx.lineTo(p.x,p.y);} ctx.closePath();
+      ctx.strokeStyle=reg.border; ctx.lineWidth=5; ctx.stroke();
+    }
+    // عنوان ها با سایه بهتر چون روی عکس میوفته
+    drawText(reg.fa, reg.x, reg.y-58, 40, '#ffffff');
+    drawText(reg.en, reg.x, reg.y-8, 20, 'rgba(255,255,255,0.85)', 'normal');
+    drawText(reg.capital, reg.x, reg.y+38, 22, '#ffd36a');
+  }
+}
+function drawRoads(){
+  ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=2*camera.zoom; ctx.setLineDash([8*camera.zoom,8*camera.zoom]);
+  for(const reg of regions){ const cap=worldToScreen(reg.x,reg.y); for(const [name,dir] of reg.points){ const [ox,oy]=dirOffset(dir); const p=worldToScreen(reg.x+ox,reg.y+oy); ctx.beginPath(); ctx.moveTo(cap.x,cap.y); ctx.lineTo(p.x,p.y); ctx.stroke(); } } ctx.restore();
+  ctx.save(); ctx.strokeStyle='rgba(255,211,106,0.7)'; ctx.lineWidth=5*camera.zoom;
+  for(const [a,b] of links){ const ra=regions.find(r=>r.id===a), rb=regions.find(r=>r.id===b); const pa=worldToScreen(ra.x,ra.y), pb=worldToScreen(rb.x,rb.y); ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y); ctx.stroke(); } ctx.restore();
+}
+function drawSettlements(){
+  for(const p of settlements){
+    const s=worldToScreen(p.x,p.y);
+    if(p.type==='capital'){ ctx.fillStyle='#ffd36a'; ctx.beginPath(); ctx.arc(s.x,s.y, (settings.showReal?8:13)*camera.zoom,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#574000'; ctx.lineWidth=2; ctx.stroke();
+      if(camera.zoom>0.5) drawText(p.name,p.x,p.y+26,17,'#ffe9b0');
+    } else { if(camera.zoom<0.6 && settings.showReal) continue; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(s.x,s.y,5*camera.zoom,0,Math.PI*2); ctx.fill(); }
+  }
+}
+function drawTrail(){ if(!settings.showTrail)return; const now=performance.now(); for(let i=playerTrail.length-1;i>=0;i--){ const t=playerTrail[i]; const age=now-t.t; if(age>650){playerTrail.splice(i,1); continue;} const alpha=1-age/650; const s=worldToScreen(t.x,t.y); ctx.beginPath(); ctx.arc(s.x,s.y,5*camera.zoom*alpha,0,Math.PI*2); ctx.fillStyle=`rgba(54,163,255,${alpha*0.35})`; ctx.fill(); } }
+function drawPlayer(){ const s=worldToScreen(player.x,player.y); ctx.save(); ctx.beginPath(); ctx.ellipse(s.x,s.y+14*camera.zoom,18*camera.zoom,8*camera.zoom,0,0,Math.PI*2); ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fill(); ctx.beginPath(); ctx.arc(s.x,s.y,player.radius*camera.zoom,0,Math.PI*2); ctx.fillStyle='#36a3ff'; ctx.fill(); ctx.lineWidth=4; ctx.strokeStyle='white'; ctx.stroke(); const fx=s.x+player.facing.x*10*camera.zoom, fy=s.y+player.facing.y*10*camera.zoom-3*camera.zoom; ctx.beginPath(); ctx.arc(fx,fy,4*camera.zoom,0,Math.PI*2); ctx.fillStyle='white'; ctx.fill(); ctx.restore(); }
+function drawGrid(){ if(!settings.showGrid)return; const step=100; ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1; const sx=Math.floor((camera.x-W/2/camera.zoom)/step)*step, ex=camera.x+W/2/camera.zoom, sy=Math.floor((camera.y-H/2/camera.zoom)/step)*step, ey=camera.y+H/2/camera.zoom; for(let x=sx;x<ex;x+=step){ const a=worldToScreen(x,sy), b=worldToScreen(x,ey); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } for(let y=sy;y<ey;y+=step){ const a=worldToScreen(sx,y), b=worldToScreen(ex,y); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); } ctx.restore(); }
+
+const mmBounds=(()=>{ let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity; for(const reg of regions) for(const p of reg.polygon){minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);} return {minX,maxX,minY,maxY};})();
+function mmTransform(x,y){ const mmW=150,mmH=140,pad=10; const scale=Math.min((mmW-pad*2)/(mmBounds.maxX-mmBounds.minX),(mmH-pad*2)/(mmBounds.maxY-mmBounds.minY)); const offX=pad-mmBounds.minX*scale+(mmW-pad*2-(mmBounds.maxX-mmBounds.minX)*scale)/2; const offY=pad-mmBounds.minY*scale+(mmH-pad*2-(mmBounds.maxY-mmBounds.minY)*scale)/2; return {x:x*scale+offX,y:y*scale+offY,scale}; }
+function drawMinimap(){ if(!settings.showMinimap)return; mmCtx.clearRect(0,0,150,140);
+  for(const reg of regions){
+    mmCtx.save(); mmCtx.beginPath(); const first=mmTransform(reg.polygon[0].x,reg.polygon[0].y); mmCtx.moveTo(first.x,first.y);
+    for(let i=1;i<reg.polygon.length;i++){ const p=mmTransform(reg.polygon[i].x,reg.polygon[i].y); mmCtx.lineTo(p.x,p.y);} mmCtx.closePath(); mmCtx.clip();
+    if(settings.showReal && reg.imgLoaded){ const b=reg.polygon.map(p=>mmTransform(p.x,p.y)); let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity; b.forEach(p=>{minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);}); const w=maxX-minX,h=maxY-minY; mmCtx.drawImage(reg.img,minX,minY,w,h); }
+    else { mmCtx.fillStyle=reg.color; mmCtx.globalAlpha=0.85; mmCtx.fill(); mmCtx.globalAlpha=1; }
+    mmCtx.restore(); mmCtx.strokeStyle=reg.border; mmCtx.lineWidth=1; mmCtx.stroke();
+  }
+  const pp=mmTransform(player.x,player.y); mmCtx.beginPath(); mmCtx.arc(pp.x,pp.y,3.4,0,Math.PI*2); mmCtx.fillStyle='#fff'; mmCtx.fill();
+}
+
+let last=performance.now(), fpsSmooth=60;
+function update(dt){
+  let ix=input.joyX||input.keyX, iy=input.joyY||input.keyY; const len=Math.hypot(ix,iy); if(len>1){ix/=len; iy/=len;}
+  player.moving=len>0.05; if(player.moving){player.animPhase+=dt*10; player.facing={x:ix,y:iy};}
+  let speed=player.speed; const reg=getRegionAt(player.x,player.y); if(reg&&reg.id==='demons')speed*=0.82;
+  const nx=player.x+ix*speed*dt, ny=player.y+iy*speed*dt;
+  if(canMoveTo(nx,ny)){player.x=nx; player.y=ny;} else { if(canMoveTo(nx,player.y))player.x=nx; if(canMoveTo(player.x,ny))player.y=ny; }
+  if(settings.showTrail&&player.moving){ const lt=playerTrail[playerTrail.length-1]; if(!lt||Math.hypot(lt.x-player.x,lt.y-player.y)>14){playerTrail.push({x:player.x,y:player.y,t:performance.now()}); if(playerTrail.length>40)playerTrail.shift();}}
+  camera.x+=(player.x-camera.x)*0.1; camera.y+=(player.y-camera.y)*0.1;
+  const newReg=getRegionAt(player.x,player.y); if(newReg&&newReg.id!==currentRegionId){currentRegionId=newReg.id; showToast(`وارد ${newReg.fa} شدید`); playBeep(newReg.id==='demons'?220:620,0.18,0.06);}
+  const near=nearestSettlement(player.x,player.y); regionNameEl.textContent=newReg?`${newReg.fa} / ${newReg.en}`:'خارج از نقشه'; nearNameEl.textContent=near.point?`${near.point.name} - ${Math.round(near.distance)}px`:'---'; coordsEl.textContent=`${Math.round(player.x)}, ${Math.round(player.y)}`;
+  const angle=Math.atan2(player.facing.y,player.facing.x)*180/Math.PI; const dirs=['➡️','↘️','⬇️','↙️','⬅️','↖️','⬆️','↗️']; const idx=Math.round(((angle+180)/45))%8; if(player.moving)compassEl.textContent=dirs[idx]||'🧭';
+}
+function render(){ ctx.clearRect(0,0,W,H); drawGrid(); drawRegions(); drawRoads(); drawTrail(); drawSettlements(); drawPlayer(); drawMinimap(); }
+function loop(now){ const dt=Math.min(0.033,(now-last)/1000); last=now; const inst=1/Math.max(dt,0.0001); fpsSmooth+=(inst-fpsSmooth)*0.1; if(settings.showFps)fpsEl.textContent='FPS: '+Math.round(fpsSmooth); update(dt); render(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
+```
+
+عکس‌ها رو که گذاشتی، نقشه دقیقا مثل تصویرهای خودت داخل هر هگز کلیپ میشه و اسم شهرها هم مطابق با همون عکس‌ها آپدیت کردم.
+
+می‌خوای من همین الان عکس‌هایی که فرستادی رو برات به base64 تبدیل کنم که بدون نیاز به فایل جداگانه همه چیز تو یک فایل HTML باشه؟
