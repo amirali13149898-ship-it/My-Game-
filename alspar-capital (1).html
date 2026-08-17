@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>السپار - پایتخت اندوریان</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      background: #0f0f13;
+      color: #e0e0e0;
+      font-family: Tahoma, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      overscroll-behavior: none;
+      touch-action: none;
+      position: fixed;
+      inset: 0;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      background: #1a1a22;
+    }
+
+    /* اطلاعات محله */
+    #zone-info {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.75);
+      border: 1px solid #444;
+      border-radius: 12px;
+      padding: 8px 18px;
+      text-align: center;
+      z-index: 20;
+      min-width: 200px;
+      backdrop-filter: blur(6px);
+    }
+
+    #zone-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #ffd700;
+      margin-bottom: 2px;
+    }
+
+    #zone-desc {
+      font-size: 11px;
+      color: #aaa;
+    }
+
+    #access-level {
+      font-size: 10px;
+      margin-top: 3px;
+      color: #8f8;
+    }
+
+    /* جوی‌استیک */
+    #joystick-zone {
+      position: absolute;
+      bottom: 30px;
+      left: 30px;
+      width: 140px;
+      height: 140px;
+      z-index: 30;
+    }
+
+    #joystick-base {
+      width: 140px;
+      height: 140px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      position: relative;
+    }
+
+    #joystick-thumb {
+      width: 60px;
+      height: 60px;
+      background: rgba(255, 215, 0, 0.7);
+      border-radius: 50%;
+      position: absolute;
+      top: 40px;
+      left: 40px;
+      box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+    }
+
+    /* دکمه‌های کناری */
+    #side-buttons {
+      position: absolute;
+      bottom: 40px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 30;
+    }
+
+    .btn {
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid #555;
+      color: #eee;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      text-align: center;
+      min-width: 90px;
+    }
+
+    .btn:active {
+      background: rgba(255, 215, 0, 0.2);
+    }
+
+    /* پیام سیستم */
+    #message {
+      position: absolute;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 25;
+      pointer-events: none;
+      text-align: center;
+      max-width: 80%;
+    }
+
+    #message.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="zone-info">
+      <div id="zone-name">بارلیر</div>
+      <div id="zone-desc">منطقه معمولی پایتخت</div>
+      <div id="access-level">دسترسی: آزاد</div>
+    </div>
+
+    <div id="message"></div>
+
+    <div id="joystick-zone">
+      <div id="joystick-base">
+        <div id="joystick-thumb"></div>
+      </div>
+    </div>
+
+    <div id="side-buttons">
+      <div class="btn" id="btn-map">نقشه</div>
+      <div class="btn" id="btn-info">اطلاعات</div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== تنظیمات تلگرام ====================
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      tg.setHeaderColor('#0f0f13');
+      tg.setBackgroundColor('#0f0f13');
+      // جلوگیری از بسته شدن اپ با سوایپ رو به پایین (نسخه‌های جدید تلگرام)
+      if (typeof tg.disableVerticalSwipes === 'function') tg.disableVerticalSwipes();
+      if (typeof tg.requestFullscreen === 'function') {
+        try { tg.requestFullscreen(); } catch (e) {}
+      }
+    }
+
+    // ==================== Canvas ====================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // ==================== داده‌های مناطق ====================
+    const ZONES = {
+      barlir: {
+        id: 'barlir',
+        name: 'بارلیر',
+        desc: 'منطقه معمولی پایتخت • گیلد • بازار • هتل',
+        access: 'آزاد',
+        accessColor: '#8f8',
+        width: 1200,
+        height: 900,
+        bgColor: '#1e2a1e',
+        wallColor: '#2d4a2d',
+        playerStart: { x: 600, y: 450 },
+        exits: [
+          { x: 560, y: 20, w: 80, h: 40, target: 'farnor', targetX: 600, targetY: 820, label: 'به فارنور' },
+          { x: 560, y: 840, w: 80, h: 40, target: 'darmir', targetX: 600, targetY: 80, label: 'به دارمیر' },
+          { x: 20, y: 400, w: 40, h: 80, target: 'farnor', targetX: 1120, targetY: 450, label: 'به فارنور' }
+        ],
+        areas: [
+          { x: 100, y: 100, w: 220, h: 160, name: 'گیلد', color: 'rgba(70, 130, 180, 0.35)' },
+          { x: 450, y: 180, w: 280, h: 180, name: 'بازار معمولی', color: 'rgba(180, 140, 50, 0.3)' },
+          { x: 850, y: 120, w: 200, h: 140, name: 'هتل', color: 'rgba(100, 80, 140, 0.35)' },
+          { x: 200, y: 550, w: 300, h: 200, name: 'منطقه مسکونی', color: 'rgba(80, 120, 80, 0.3)' },
+          { x: 700, y: 600, w: 180, h: 120, name: 'بازار سیاه (شب)', color: 'rgba(120, 40, 40, 0.4)' }
+        ]
+      },
+
+      farnor: {
+        id: 'farnor',
+        name: 'فارنور',
+        desc: 'منطقه اشرافی • تجهیزات لوکس',
+        access: 'فقط اشراف',
+        accessColor: '#f88',
+        width: 1100,
+        height: 800,
+        bgColor: '#1a1a2e',
+        wallColor: '#3a3a5c',
+        playerStart: { x: 550, y: 400 },
+        exits: [
+          { x: 510, y: 740, w: 80, h: 40, target: 'barlir', targetX: 600, targetY: 80, label: 'به بارلیر' },
+          { x: 1040, y: 350, w: 40, h: 80, target: 'barlir', targetX: 80, targetY: 450, label: 'به بارلیر' },
+          { x: 510, y: 20, w: 80, h: 40, target: 'castle', targetX: 400, targetY: 500, label: 'به قلعه' }
+        ],
+        areas: [
+          { x: 150, y: 100, w: 250, h: 180, name: 'فروشگاه لوکس', color: 'rgba(180, 150, 50, 0.35)' },
+          { x: 500, y: 80, w: 300, h: 150, name: 'عمارت‌های اشرافی', color: 'rgba(100, 80, 160, 0.3)' },
+          { x: 200, y: 400, w: 400, h: 200, name: 'باغ اشرافی', color: 'rgba(50, 120, 70, 0.3)' }
+        ]
+      },
+
+      darmir: {
+        id: 'darmir',
+        name: 'دارمیر',
+        desc: 'منطقه فقیرنشین • امنیت پایین',
+        access: 'آزاد (خطرناک)',
+        accessColor: '#fa5',
+        width: 1000,
+        height: 750,
+        bgColor: '#1a1510',
+        wallColor: '#3a3020',
+        playerStart: { x: 500, y: 375 },
+        exits: [
+          { x: 460, y: 20, w: 80, h: 40, target: 'barlir', targetX: 600, targetY: 820, label: 'به بارلیر' }
+        ],
+        areas: [
+          { x: 80, y: 100, w: 200, h: 150, name: 'خانه‌های ارزان', color: 'rgba(80, 60, 40, 0.4)' },
+          { x: 400, y: 200, w: 220, h: 160, name: 'بازار ارزان', color: 'rgba(100, 80, 40, 0.35)' },
+          { x: 700, y: 120, w: 180, h: 200, name: 'بازار سیاه واقعی', color: 'rgba(90, 20, 20, 0.5)' },
+          { x: 150, y: 450, w: 300, h: 150, name: 'کوچه‌های تاریک', color: 'rgba(40, 30, 20, 0.5)' }
+        ]
+      },
+
+      castle: {
+        id: 'castle',
+        name: 'قلعه سلطنتی',
+        desc: 'محل زندگی خاندان سلطنتی',
+        access: 'ممنوع • فقط اشراف سطح بالا',
+        accessColor: '#f44',
+        width: 800,
+        height: 600,
+        bgColor: '#151520',
+        wallColor: '#4a4060',
+        playerStart: { x: 400, y: 300 },
+        exits: [
+          { x: 360, y: 540, w: 80, h: 40, target: 'farnor', targetX: 550, targetY: 80, label: 'خروج' }
+        ],
+        areas: [
+          { x: 250, y: 100, w: 300, h: 220, name: 'تالار اصلی', color: 'rgba(120, 100, 60, 0.35)' },
+          { x: 100, y: 350, w: 180, h: 120, name: 'اتاق نگهبانان', color: 'rgba(70, 70, 100, 0.4)' }
+        ]
+      }
+    };
+
+    // ==================== وضعیت بازی ====================
+    let currentZone = 'barlir';
+    let player = {
+      x: ZONES.barlir.playerStart.x,
+      y: ZONES.barlir.playerStart.y,
+      radius: 14,
+      speed: 3.2
+    };
+
+    let camera = { x: 0, y: 0 };
+    let doorCooldown = false; // جلوگیری از فعال شدن مکرر یک در در هر فریم
+
+    // ==================== جوی‌استیک ====================
+    const thumb = document.getElementById('joystick-thumb');
+    const base = document.getElementById('joystick-base');
+    let joystick = { active: false, dx: 0, dy: 0 };
+    const maxDist = 40;
+
+    function handleJoyStart(e) {
+      e.preventDefault();
+      joystick.active = true;
+      handleJoyMove(e);
+    }
+
+    function handleJoyMove(e) {
+      if (!joystick.active) return;
+      e.preventDefault();
+
+      const rect = base.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      let dx = clientX - (rect.left + rect.width / 2);
+      let dy = clientY - (rect.top + rect.height / 2);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > maxDist) {
+        dx = (dx / dist) * maxDist;
+        dy = (dy / dist) * maxDist;
+      }
+
+      thumb.style.left = (40 + dx) + 'px';
+      thumb.style.top = (40 + dy) + 'px';
+
+      joystick.dx = dx / maxDist;
+      joystick.dy = dy / maxDist;
+    }
+
+    function handleJoyEnd() {
+      joystick.active = false;
+      joystick.dx = 0;
+      joystick.dy = 0;
+      thumb.style.left = '40px';
+      thumb.style.top = '40px';
+    }
+
+    base.addEventListener('mousedown', handleJoyStart);
+    base.addEventListener('touchstart', handleJoyStart, { passive: false });
+    window.addEventListener('mousemove', handleJoyMove);
+    window.addEventListener('touchmove', handleJoyMove, { passive: false });
+    window.addEventListener('mouseup', handleJoyEnd);
+    window.addEventListener('touchend', handleJoyEnd);
+
+    // ==================== پیام ====================
+    function showMessage(text, duration = 2200) {
+      const el = document.getElementById('message');
+      el.textContent = text;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), duration);
+    }
+
+    // ==================== تغییر منطقه ====================
+    function changeZone(targetId, targetX, targetY) {
+      const zone = ZONES[targetId];
+      if (!zone) return;
+
+      // محدودیت ورود به قلعه و فارنور
+      if (targetId === 'castle') {
+        showMessage('⛔ ورود به قلعه سلطنتی فقط برای اشراف سطح بالا مجاز است');
+        doorCooldown = true;
+        setTimeout(() => { doorCooldown = false; }, 1200);
+        return;
+      }
+      if (targetId === 'farnor') {
+        showMessage('⚠ منطقه اشرافی • ورود برای ماجراجوهای معمولی محدود است (فعلاً اجازه داده شد)');
+      }
+
+      currentZone = targetId;
+      player.x = targetX;
+      player.y = targetY;
+      doorCooldown = true;
+      setTimeout(() => { doorCooldown = false; }, 600);
+
+      // آپدیت UI
+      document.getElementById('zone-name').textContent = zone.name;
+      document.getElementById('zone-desc').textContent = zone.desc;
+      const accessEl = document.getElementById('access-level');
+      accessEl.textContent = 'دسترسی: ' + zone.access;
+      accessEl.style.color = zone.accessColor;
+
+      showMessage('وارد ' + zone.name + ' شدی');
+    }
+
+    // ==================== آپدیت ====================
+    function update() {
+      const zone = ZONES[currentZone];
+
+      // حرکت (نرمالایز شده تا حرکت مورب سریع‌تر از حرکت مستقیم نباشه)
+      let mx = joystick.dx;
+      let my = joystick.dy;
+      const mag = Math.sqrt(mx * mx + my * my);
+      if (mag > 1) { mx /= mag; my /= mag; }
+      player.x += mx * player.speed;
+      player.y += my * player.speed;
+
+      // محدودیت داخل نقشه
+      player.x = Math.max(player.radius, Math.min(zone.width - player.radius, player.x));
+      player.y = Math.max(player.radius, Math.min(zone.height - player.radius, player.y));
+
+      // بررسی خروج‌ها (در زمان کول‌داون بررسی نمی‌کنیم تا پیام/تغییر منطقه تکراری نشه)
+      if (!doorCooldown) {
+        for (const exit of zone.exits) {
+          if (
+            player.x > exit.x &&
+            player.x < exit.x + exit.w &&
+            player.y > exit.y &&
+            player.y < exit.y + exit.h
+          ) {
+            changeZone(exit.target, exit.targetX, exit.targetY);
+            break;
+          }
+        }
+      }
+
+      // دوربین
+      camera.x = player.x - canvas.width / 2;
+      camera.y = player.y - canvas.height / 2;
+      camera.x = Math.max(0, Math.min(zone.width - canvas.width, camera.x));
+      camera.y = Math.max(0, Math.min(zone.height - canvas.height, camera.y));
+    }
+
+    // ==================== رندر ====================
+    function draw() {
+      const zone = ZONES[currentZone];
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // پس‌زمینه منطقه
+      ctx.fillStyle = zone.bgColor;
+      ctx.fillRect(-camera.x, -camera.y, zone.width, zone.height);
+
+      // حاشیه نقشه
+      ctx.strokeStyle = zone.wallColor;
+      ctx.lineWidth = 8;
+      ctx.strokeRect(-camera.x, -camera.y, zone.width, zone.height);
+
+      // مناطق داخلی (گیلد، بازار و ...)
+      for (const area of zone.areas) {
+        ctx.fillStyle = area.color;
+        ctx.fillRect(area.x - camera.x, area.y - camera.y, area.w, area.h);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = '13px Tahoma';
+        ctx.textAlign = 'center';
+        ctx.fillText(area.name, area.x - camera.x + area.w / 2, area.y - camera.y + area.h / 2 + 5);
+      }
+
+      // خروجی‌ها
+      for (const exit of zone.exits) {
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.35)';
+        ctx.fillRect(exit.x - camera.x, exit.y - camera.y, exit.w, exit.h);
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(exit.x - camera.x, exit.y - camera.y, exit.w, exit.h);
+      }
+
+      // بازیکن
+      ctx.beginPath();
+      ctx.arc(player.x - camera.x, player.y - camera.y, player.radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffd700';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // سایه زیر بازیکن
+      ctx.beginPath();
+      ctx.arc(player.x - camera.x, player.y - camera.y + 18, 9, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fill();
+    }
+
+    // ==================== حلقه بازی ====================
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // دکمه‌ها
+    document.getElementById('btn-map').addEventListener('click', () => {
+      showMessage('نقشه جهان به‌زودی اضافه می‌شود');
+    });
+
+    document.getElementById('btn-info').addEventListener('click', () => {
+      const zone = ZONES[currentZone];
+      showMessage(zone.name + ' • ' + zone.desc, 3000);
+    });
+
+    // شروع
+    showMessage('خوش آمدی به السپار • محله بارلیر', 2800);
+    gameLoop();
+  </script>
+</body>
+</html>
