@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>نقشه بازی</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/@panzoom/panzoom@4.6.2/dist/panzoom.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #111;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+    }
+    #map-container {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      touch-action: none;
+      position: relative;
+      background: #222;
+    }
+    #map {
+      display: block;
+      width: auto; height: auto;
+      max-width: none;
+      touch-action: none;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-drag: none;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+    #map:active { cursor: grabbing; }
+    #map.hidden { display: none; }
+
+    #error-msg {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      background: rgba(0,0,0,0.85);
+      padding: 25px 30px;
+      border-radius: 12px;
+      text-align: center;
+      font-family: sans-serif;
+      display: none;
+      z-index: 10;
+      max-width: 85%;
+      direction: rtl;
+      backdrop-filter: blur(4px);
+      border: 1px solid #555;
+    }
+    #error-msg button {
+      margin-top: 15px;
+      padding: 10px 28px;
+      background: #4CAF50;
+      border: none;
+      color: #fff;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    #error-msg button:hover { background: #45a049; }
+    #error-msg button:active { transform: scale(0.96); }
+  </style>
+</head>
+<body>
+  <div id="map-container">
+    <img id="map" src="https://i.ibb.co/Y4NtgbRZ/map.jpg" alt="نقشه بازی">
+    <div id="error-msg">
+      <span id="error-text">خطا در بارگذاری نقشه</span>
+      <br><button id="retry-btn">تلاش مجدد</button>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      // ---------- المان‌ها ----------
+      const img = document.getElementById('map');
+      const container = document.getElementById('map-container');
+      const errorDiv = document.getElementById('error-msg');
+      const errorText = document.getElementById('error-text');
+      const retryBtn = document.getElementById('retry-btn');
+
+      let panzoom = null;
+      let loadAttempts = 0;
+      const MAX_ATTEMPTS = 3;
+      let coverScale = 1;
+      let isUserZooming = false;
+      let zoomStartTimer = null;
+      let resizeTimer = null;
+      let isRetrying = false; // جلوگیری از تداخل Retry
+
+      // ---------- توابع کمکی ----------
+      function showError(msg) {
+        img.classList.add('hidden');
+        errorText.textContent = msg || 'خطا در بارگذاری نقشه';
+        errorDiv.style.display = 'block';
+      }
+
+      function hideError() {
+        img.classList.remove('hidden');
+        errorDiv.style.display = 'none';
+      }
+
+      // افزودن پارامتر به URL (مدیریت ? و &)
+      function addQueryParam(url, key, value) {
+        const hasQuery = url.includes('?');
+        const separator = hasQuery ? '&' : '?';
+        return url + separator + key + '=' + encodeURIComponent(value);
+      }
+
+      // ---------- 1. بررسی وجود Panzoom ----------
+      if (typeof Panzoom === 'undefined') {
+        showError('کتابخانه نقشه بارگذاری نشد. اتصال اینترنت را بررسی کنید.');
+        console.error('❌ Panzoom not loaded');
+        return;
+      }
+
+      // ---------- 2. راه‌اندازی تلگرام با بررسی کامل ----------
+      let tg = null;
+      try {
+        if (window.Telegram && window.Telegram.WebApp) {
+          tg = window.Telegram.WebApp;
+          tg.ready();
+          tg.expand();
+
+          // بررسی وجود متد requestFullscreen قبل از فراخوانی
+          if (tg && typeof tg.requestFullscreen === 'function') {
+            try {
+              const fullscreenPromise = tg.requestFullscreen();
+              if (fullscreenPromise && typeof fullscreenPromise.catch === 'function') {
+                fullscreenPromise.catch(err => {
+                  console.warn('Fullscreen rejected:', err.message);
+                });
+              }
+            } catch (e) {
+              console.warn('Fullscreen sync error:', e.message);
+            }
+          } else {
+            console.warn('requestFullscreen not available');
+          }
+        } else {
+          console.warn('Telegram WebApp not available (maybe running in browser)');
+        }
+      } catch (e) {
+        console.warn('Telegram init error:', e.message);
+        tg = null;
+      }
+
+      // ---------- 3. محاسبه مقیاس Cover ----------
+      function calcCoverScale() {
+        if (!img.naturalWidth || !img.naturalHeight) return 1;
+        const sw = window.innerWidth;
+        const sh = window.innerHeight;
+        return Math.max(sw / img.naturalWidth, sh / img.naturalHeight);
+      }
+
+      // ---------- 4. تابع مدیریت gesture (با یک مرجع ثابت) ----------
+      function gestureHandler(e) {
+        if (container.contains(e.target)) e.preventDefault();
+      }
+
+      // فقط یک بار listenerهای gesture را اضافه می‌کنیم
+      document.addEventListener('gesturestart', gestureHandler);
+      document.addEventListener('gesturechange', gestureHandler);
+
+      // ---------- 5. تابع اصلی راه‌اندازی Panzoom ----------
+      function initPanzoom() {
+        // جلوگیری از اجرای همزمان چند باره
+        if (isRetrying) return;
+        isRetrying = true;
+
+        // اگر قبلاً ساخته شده، آن را نابود کن
+        if (panzoom) {
+          try {
+            panzoom.destroy();
+          } catch (e) {
+            console.warn('Error destroying previous panzoom:', e);
+          }
+          panzoom = null;
+        }
+
+        // بررسی بارگذاری تصویر
+        if (!img.naturalWidth || !img.naturalHeight) {
+          if (loadAttempts < MAX_ATTEMPTS) {
+            loadAttempts++;
+            console.warn(`تلاش ${loadAttempts} از ${MAX_ATTEMPTS} برای بارگذاری تصویر...`);
+            isRetrying = false;
+            setTimeout(initPanzoom, 1200);
+          } else {
+            showError('نقشه بارگذاری نشد. لطفاً دوباره تلاش کنید.');
+            isRetrying = false;
+          }
+          return;
+        }
+
+        // ریست شمارش در صورت موفقیت
+        loadAttempts = 0;
+        hideError();
+
+        // محاسبه مقیاس cover
+        coverScale = calcCoverScale();
+        if (coverScale < 0.1) coverScale = 1;
+
+        // حذف transform قبلی
+        img.style.transform = 'none';
+
+        try {
+          panzoom = Panzoom(img, {
+            startScale: coverScale,
+            minScale: coverScale * 0.5,
+            maxScale: Math.max(coverScale * 5, 12), // افزایش maxScale برای جزئیات بیشتر
+            contain: 'outside',
+            cursor: 'grab',
+            touchAction: 'none',
+            animate: true,
+            duration: 150,
+            wheel: true,   // فعال کردن چرخ موس برای دسکتاپ
+            touchstart: 'auto',
+            touchmove: 'auto',
+            touchend: 'auto',
+          });
+
+          // ذخیره در window برای دیباگ
+          window.panzoom = panzoom;
+
+          // ---------- مدیریت isUserZooming با تایم‌اوت ----------
+          const onZoomStart = () => {
+            isUserZooming = true;
+            clearTimeout(zoomStartTimer);
+          };
+          const onZoomEnd = () => {
+            isUserZooming = false;
+            clearTimeout(zoomStartTimer);
+          };
+
+          // حذف listenerهای قبلی
+          if (panzoom._zoomStartHandler) {
+            panzoom.off('zoomstart', panzoom._zoomStartHandler);
+          }
+          if (panzoom._zoomEndHandler) {
+            panzoom.off('zoomend', panzoom._zoomEndHandler);
+          }
+          panzoom._zoomStartHandler = onZoomStart;
+          panzoom._zoomEndHandler = onZoomEnd;
+          panzoom.on('zoomstart', onZoomStart);
+          panzoom.on('zoomend', onZoomEnd);
+
+          // تایم‌اوت برای ریست خودکار در صورت عدم دریافت zoomend
+          // در واقع یک fallback است
+          const oldZoomStart = onZoomStart;
+          panzoom.on('zoomstart', function() {
+            clearTimeout(zoomStartTimer);
+            zoomStartTimer = setTimeout(() => {
+              isUserZooming = false;
+              console.warn('⏱️ Zoom end timeout: resetting isUserZooming');
+            }, 800);
+          });
+
+          // ---------- 6. مدیریت رویدادهای لمس فقط روی container ----------
+          container.removeEventListener('touchmove', container._touchMoveHandler);
+          container._touchMoveHandler = function(e) {
+            if (container.contains(e.target)) {
+              e.preventDefault();
+            }
+          };
+          container.addEventListener('touchmove', container._touchMoveHandler, { passive: false });
+
+          console.log('✅ Panzoom فعال شد، مقیاس اولیه:', coverScale);
+        } catch (e) {
+          console.error('❌ خطا در راه‌اندازی panzoom:', e);
+          showError('خطا در راه‌اندازی نقشه: ' + e.message);
+          panzoom = null;
+        } finally {
+          isRetrying = false;
+        }
+      }
+
+      // ---------- 7. مدیریت تغییر اندازه (Resize + Fullscreen) ----------
+      function handleResize() {
+        if (!panzoom) return;
+        if (isUserZooming) return; // جلوگیری از تداخل با زوم کاربر
+
+        const newCover = calcCoverScale();
+        if (Math.abs(newCover - coverScale) < 0.01) return; // تغییر محسوس نیست
+
+        // محاسبه نسبت زوم کاربر
+        const currentScale = panzoom.getScale();
+        const userZoomRatio = currentScale / coverScale;
+
+        // تنظیم cover جدید
+        coverScale = newCover;
+        const newScale = userZoomRatio * coverScale;
+
+        // محدود کردن به min/max
+        const minScale = coverScale * 0.5;
+        const maxScale = Math.max(coverScale * 5, 12);
+        const clampedScale = Math.min(Math.max(newScale, minScale), maxScale);
+
+        // اعمال تغییر با انیمیشن
+        panzoom.zoomTo(clampedScale, { animate: true, duration: 200 });
+        console.log(`🔄 Resize: scale adjusted to ${clampedScale.toFixed(2)}`);
+      }
+
+      function throttledResize() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(handleResize, 250);
+      }
+
+      window.addEventListener('resize', throttledResize);
+
+      // شنود خروج از تمام‌صفحه
+      document.addEventListener('fullscreenchange', throttledResize);
+      document.addEventListener('webkitfullscreenchange', throttledResize);
+      document.addEventListener('mozfullscreenchange', throttledResize);
+      document.addEventListener('MSFullscreenChange', throttledResize);
+
+      // ---------- 8. بارگذاری تصویر با مدیریت کامل ----------
+      img.addEventListener('load', function() {
+        loadAttempts = 0;
+        // فقط اگر retry در حال اجرا نباشد، راه‌اندازی کن
+        if (!isRetrying) {
+          initPanzoom();
+        }
+      });
+
+      img.addEventListener('error', function() {
+        console.error('❌ تصویر بارگذاری نشد (۴۰۴ یا قطعی)');
+        showError('نقشه پیدا نشد. لطفاً اتصال اینترنت را بررسی کنید.');
+      });
+
+      // اگر تصویر از قبل کش شده باشد
+      if (img.complete && img.naturalWidth) {
+        loadAttempts = 0;
+        initPanzoom();
+      } else if (img.complete && !img.naturalWidth) {
+        showError('نقشه قابل بارگذاری نیست.');
+      }
+
+      // ---------- 9. Fallback با شرط کامل ----------
+      setTimeout(function() {
+        // فقط اگر panzoom ساخته نشده، خطا نمایش داده نشده، و تصویر کامل بارگذاری شده باشد
+        if (!panzoom && errorDiv.style.display !== 'block' && img.complete && img.naturalWidth > 0) {
+          console.warn('⏳ Fallback: تصویر کامل است اما panzoom ساخته نشده، تلاش مجدد...');
+          initPanzoom();
+        }
+      }, 3000);
+
+      // ---------- 10. دکمه تلاش مجدد (فقط تغییر src) ----------
+      retryBtn.addEventListener('click', function() {
+        if (isRetrying) return; // جلوگیری از تداخل
+
+        loadAttempts = 0;
+        hideError();
+        // بارگذاری مجدد با افزودن پارامتر زمان به‌درستی
+        const baseSrc = img.src.split('?')[0]; // حذف کوئری قبلی
+        img.src = addQueryParam(baseSrc, 't', Date.now());
+        // نیازی به فراخوانی initPanzoom نیست، رویداد load آن را اجرا می‌کند
+        // همچنین isRetrying را true نمی‌کنیم چون منتظر load هستیم
+        console.log('🔄 تلاش مجدد برای بارگذاری تصویر...');
+      });
+
+      // ---------- 11. پاک‌سازی تایمر resize (اختیاری) ----------
+      // در صورت نابودی panzoom، تایمرها همچنان فعالند اما شرط !panzoom از اجرا جلوگیری می‌کند
+
+      // ---------- 12. مدیریت خطاهای ناهمگام ----------
+      window.addEventListener('unhandledrejection', function(e) {
+        if (e.reason && e.reason.message && e.reason.message.includes('Panzoom')) {
+          console.warn('Unhandled Panzoom error:', e.reason);
+          showError('خطای ناشناخته در نقشه. لطفاً صفحه را مجدداً بارگذاری کنید.');
+        }
+      });
+
+      console.log('🚀 اپلیکیشن نقشه با موفقیت راه‌اندازی شد');
+    })();
+  </script>
+</body>
+</html>
