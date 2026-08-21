@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>پادشاهی الف‌ها</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/@panzoom/panzoom@4.6.2/dist/panzoom.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0f0f14;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #map-container {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      position: relative;
+      background: radial-gradient(ellipse at center, #1a1a26 0%, #0a0a10 100%);
+      touch-action: none;
+    }
+    #map-wrapper {
+      position: relative;
+      display: block;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+    #map {
+      display: block;
+      width: auto; height: auto;
+      max-width: none;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      -webkit-user-select: none;
+      pointer-events: none;
+      will-change: transform;
+    }
+    .hidden { display: none !important; }
+
+    .city-hit {
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      transform: translate(-50%, -50%);
+      z-index: 11;
+      cursor: pointer;
+      background: transparent;
+      border-radius: 50%;
+      touch-action: none;
+      will-change: transform;
+    }
+    .city-icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 26px;
+      height: 26px;
+      background: #e63946;
+      transform: translate(-50%, -50%) rotate(45deg);
+      border: 2.5px solid #fff;
+      border-radius: 3px;
+      box-shadow: 0 0 14px rgba(230, 57, 70, 0.75);
+      pointer-events: none;
+      transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+    }
+    .city-hit.is-pressed .city-icon {
+      transform: translate(-50%, -50%) rotate(45deg) scale(0.85);
+      box-shadow: 0 0 20px rgba(230, 57, 70, 0.95);
+    }
+    .city-icon::after {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 7px; height: 7px;
+      background: #fff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+    }
+
+    .city-label {
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      transform: translateX(-50%);
+      margin-top: 10px;
+      white-space: nowrap;
+      color: #fff;
+      font-family: 'Tahoma', 'Vazirmatn', sans-serif;
+      font-size: 13px;
+      font-weight: bold;
+      text-shadow: 0 0 6px rgba(0,0,0,0.95), 0 1px 2px rgba(0,0,0,0.8);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .city-hit.is-pressed .city-label,
+    .city-hit:hover .city-label {
+      opacity: 1;
+    }
+
+    #error-msg {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      background: rgba(15,15,25,0.95);
+      padding: 28px 34px;
+      border-radius: 14px;
+      text-align: center;
+      font-family: sans-serif;
+      display: none;
+      z-index: 30;
+      max-width: 86%;
+      direction: rtl;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+    #error-msg button {
+      margin-top: 18px;
+      padding: 11px 32px;
+      background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+      border: none;
+      color: #fff;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(76,175,80,0.4);
+      transition: transform 0.1s;
+    }
+    #error-msg button:active {
+      transform: scale(0.96);
+    }
+
+    #loader {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: #aaa;
+      font-family: sans-serif;
+      font-size: 14px;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      direction: rtl;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #e63946;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="map-container">
+    <div id="map-wrapper">
+      <img id="map" src="https://i.ibb.co/WW78CQy4/03.jpg" alt="پادشاهی الف‌ها" draggable="false">
+
+      <div class="city-hit" style="left: 50%; top: 47%;" data-city="1" data-name="پایتخت">
+        <div class="city-icon"></div>
+        <div class="city-label">پایتخت</div>
+      </div>
+      <div class="city-hit" style="left: 50%; top: 87.5%;" data-city="2" data-name="شهر جنوبی">
+        <div class="city-icon"></div>
+        <div class="city-label">شهر جنوبی</div>
+      </div>
+      <div class="city-hit" style="left: 50.15%; top: 10%;" data-city="3" data-name="شهر شمالی">
+        <div class="city-icon"></div>
+        <div class="city-label">شهر شمالی</div>
+      </div>
+      <div class="city-hit" style="left: 11.29%; top: 48.3%;" data-city="4" data-name="شهر غربی">
+        <div class="city-icon"></div>
+        <div class="city-label">شهر غربی</div>
+      </div>
+      <div class="city-hit" style="left: 88.95%; top: 48.3%;" data-city="5" data-name="شهر شرقی">
+        <div class="city-icon"></div>
+        <div class="city-label">شهر شرقی</div>
+      </div>
+    </div>
+
+    <div id="loader">
+      <div class="spinner"></div>
+      <div>در حال بارگذاری نقشه…</div>
+    </div>
+
+    <div id="error-msg">
+      <span id="error-text">خطا در بارگذاری نقشه</span>
+      <br>
+      <button id="retry-btn">تلاش مجدد</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ---------- عناصر DOM ----------
+      const img = document.getElementById('map');
+      const wrapper = document.getElementById('map-wrapper');
+      const container = document.getElementById('map-container');
+      const errorDiv = document.getElementById('error-msg');
+      const errorText = document.getElementById('error-text');
+      const retryBtn = document.getElementById('retry-btn');
+      const loader = document.getElementById('loader');
+      const cityHits = Array.from(document.querySelectorAll('.city-hit'));
+
+      // ---------- state ----------
+      let panzoom = null;
+      let loadAttempts = 0;
+      const MAX_ATTEMPTS = 3;
+      let coverScale = 1;
+      let containScale = 1;
+      let isUserInteracting = false;
+      let activePointerCount = 0;
+      let resizeTimer = null;
+      let initTimeoutId = null;
+      let isInitializing = false;
+      let destroyed = false;
+      let needsResizeAfter = false;
+      let panzoomScriptLoading = false;
+
+      const clickState = new WeakMap();
+      const CLICK_THRESHOLD = 8;
+      const MOVE_THRESHOLD = 6;
+
+      // ---------- ابزارها ----------
+      function logError(msg, err) {
+        try { console.error('[Map]', msg, err || ''); } catch (_) {}
+      }
+
+      function showLoader(visible) {
+        loader.style.display = visible ? 'flex' : 'none';
+      }
+
+      function showError(msg) {
+        destroyPanzoom();
+        img.classList.add('hidden');
+        wrapper.style.display = 'none';
+        cityHits.forEach(h => h.style.display = 'none');
+        showLoader(false);
+        errorText.textContent = msg || 'خطا در بارگذاری نقشه';
+        errorDiv.style.display = 'block';
+      }
+
+      function hideError() {
+        errorDiv.style.display = 'none';
+        wrapper.style.display = '';
+        img.classList.remove('hidden');
+        cityHits.forEach(h => h.style.display = '');
+      }
+
+      function addOrReplaceCacheBust(url) {
+        const bust = 't=' + Date.now();
+        try {
+          const u = new URL(url, window.location.href);
+          u.searchParams.set('t', Date.now());
+          return u.toString();
+        } catch (e) {
+          const cleaned = url.replace(/([?&])t=\d+(&|$)/, (m, p1, p2) => p2 ? p1 : '');
+          const sep = cleaned.includes('?') ? '&' : '?';
+          return cleaned + sep + bust;
+        }
+      }
+
+      function getViewportSize() {
+        try {
+          if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            const w = tg.viewportWidth || tg.viewportStableWidth;
+            const h = tg.viewportHeight || tg.viewportStableHeight;
+            if (w > 10 && h > 10) return { w, h };
+          }
+        } catch (e) {}
+        return {
+          w: window.innerWidth || document.documentElement.clientWidth || 1,
+          h: window.innerHeight || document.documentElement.clientHeight || 1
+        };
+      }
+
+      function calcScales() {
+        if (!img.naturalWidth || !img.naturalHeight || img.naturalWidth <= 0 || img.naturalHeight <= 0) {
+          return { cover: 1, contain: 1 };
+        }
+        const { w, h } = getViewportSize();
+        if (!w || !h || w < 10 || h < 10) return { cover: 1, contain: 1 };
+        const cover = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+        const contain = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+        return {
+          cover: (isFinite(cover) && cover > 0) ? cover : 1,
+          contain: (isFinite(contain) && contain > 0) ? contain : 1
+        };
+      }
+
+      function setInteracting() {
+        isUserInteracting = true;
+      }
+
+      function onPointerDown(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        activePointerCount++;
+        isUserInteracting = true;
+      }
+
+      function onPointerUp(e) {
+        activePointerCount = Math.max(0, activePointerCount - 1);
+        if (activePointerCount === 0) {
+          setTimeout(() => {
+            if (activePointerCount === 0) {
+              isUserInteracting = false;
+              if (needsResizeAfter) {
+                needsResizeAfter = false;
+                handleResize();
+              }
+            }
+          }, 80);
+        }
+      }
+
+      function onPanzoomEnd() {
+        setTimeout(() => {
+          if (activePointerCount === 0) {
+            isUserInteracting = false;
+            if (needsResizeAfter) {
+              needsResizeAfter = false;
+              handleResize();
+            }
+          }
+        }, 120);
+      }
+
+      function onVisibilityChange() {
+        if (document.hidden) {
+          activePointerCount = 0;
+          isUserInteracting = false;
+        }
+      }
+
+      function destroyPanzoom() {
+        if (panzoom) {
+          try {
+            try { panzoom.setStyle('transform', ''); } catch (_) {}
+            panzoom.destroy();
+          } catch (e) {
+            logError('panzoom.destroy failed', e);
+          }
+          panzoom = null;
+        }
+        isUserInteracting = false;
+        needsResizeAfter = false;
+        activePointerCount = 0;
+        try {
+          wrapper.removeEventListener('panzoomstart', setInteracting);
+          wrapper.removeEventListener('panzoomzoom', setInteracting);
+          wrapper.removeEventListener('panzoomend', onPanzoomEnd);
+          wrapper.removeEventListener('wheel', onWheel, { passive: false });
+          container.removeEventListener('pointerdown', onPointerDown);
+          container.removeEventListener('pointerup', onPointerUp);
+          container.removeEventListener('pointercancel', onPointerUp);
+          container.removeEventListener('pointerleave', onPointerUp);
+          window.removeEventListener('pointerup', onPointerUp);
+          window.removeEventListener('pointercancel', onPointerUp);
+        } catch (e) {}
+      }
+
+      function centerMap(scale) {
+        if (!panzoom || !img.naturalWidth || img.naturalWidth <= 0) return;
+        try {
+          const s = (typeof scale === 'number' && isFinite(scale) && scale > 0) ? scale : coverScale;
+          const { w, h } = getViewportSize();
+          const scaledW = img.naturalWidth * s;
+          const scaledH = img.naturalHeight * s;
+          const x = (w - scaledW) / 2;
+          const y = (h - scaledH) / 2;
+          if (isFinite(x) && isFinite(y)) {
+            panzoom.pan(x, y, { animate: false, relative: false });
+            try { panzoom.zoom(s, { animate: false, relative: false }); } catch (_) {}
+          }
+        } catch (e) {
+          logError('centerMap failed', e);
+        }
+      }
+
+      function onWheel(e) {
+        setInteracting();
+        clearTimeout(onWheel._t);
+        onWheel._t = setTimeout(() => {
+          isUserInteracting = false;
+          if (needsResizeAfter) {
+            needsResizeAfter = false;
+            handleResize();
+          }
+        }, 220);
+      }
+
+      function initPanzoom() {
+        if (isInitializing || destroyed) return;
+        isInitializing = true;
+        if (initTimeoutId) {
+          clearTimeout(initTimeoutId);
+          initTimeoutId = null;
+        }
+        destroyPanzoom();
+
+        if (!img.naturalWidth || !img.naturalHeight || img.naturalWidth <= 0 || img.naturalHeight <= 0) {
+          if (loadAttempts < MAX_ATTEMPTS) {
+            loadAttempts++;
+            isInitializing = false;
+            initTimeoutId = setTimeout(initPanzoom, 1000);
+          } else {
+            showError('نقشه بارگذاری نشد. لطفاً دوباره تلاش کنید.');
+            isInitializing = false;
+          }
+          return;
+        }
+
+        loadAttempts = 0;
+        hideError();
+        showLoader(false);
+
+        const scales = calcScales();
+        coverScale = scales.cover;
+        containScale = scales.contain;
+
+        wrapper.style.width = img.naturalWidth + 'px';
+        wrapper.style.height = img.naturalHeight + 'px';
+
+        try {
+          const minScale = Math.max(containScale * 0.6, 0.05);
+          const maxScale = Math.max(coverScale * 8, 20);
+
+          panzoom = Panzoom(wrapper, {
+            startScale: coverScale,
+            minScale: minScale,
+            maxScale: maxScale,
+            contain: 'outside',
+            cursor: 'grab',
+            touchAction: 'none',
+            animate: false,
+            duration: 160,
+            wheel: true,
+            step: 0.12,
+            panOnlyWhenZoomed: false,
+            exclude: []
+          });
+
+          centerMap(coverScale);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (panzoom && !destroyed) centerMap(coverScale);
+            });
+          });
+
+          wrapper.addEventListener('panzoomstart', setInteracting, { passive: true });
+          wrapper.addEventListener('panzoomzoom', setInteracting, { passive: true });
+          wrapper.addEventListener('panzoomend', onPanzoomEnd, { passive: true });
+          wrapper.addEventListener('wheel', onWheel, { passive: true });
+
+          container.addEventListener('pointerdown', onPointerDown, { passive: true });
+          container.addEventListener('pointerup', onPointerUp, { passive: true });
+          container.addEventListener('pointercancel', onPointerUp, { passive: true });
+          container.addEventListener('pointerleave', onPointerUp, { passive: true });
+
+          window.addEventListener('pointerup', onPointerUp, { passive: true });
+          window.addEventListener('pointercancel', onPointerUp, { passive: true });
+
+        } catch (e) {
+          logError('initPanzoom failed', e);
+          showError('خطا در راه‌اندازی نقشه: ' + (e && e.message ? e.message : e));
+          panzoom = null;
+        } finally {
+          isInitializing = false;
+        }
+      }
+
+      function handleResize() {
+        if (destroyed) return;
+        if (!panzoom) return;
+        if (isUserInteracting || activePointerCount > 0) {
+          needsResizeAfter = true;
+          return;
+        }
+        try {
+          const newScales = calcScales();
+          if (!isFinite(newScales.cover) || newScales.cover < 0.05) return;
+          const currentScale = panzoom.getScale();
+          if (!isFinite(currentScale) || currentScale <= 0) return;
+          if (!isFinite(coverScale) || coverScale <= 0) return;
+
+          const userZoomRatio = currentScale / coverScale;
+          const wasAtDefault = Math.abs(userZoomRatio - 1) < 0.15;
+
+          coverScale = newScales.cover;
+          containScale = newScales.contain;
+
+          const minScale = Math.max(containScale * 0.6, 0.05);
+          const maxScale = Math.max(coverScale * 8, 20);
+          panzoom.setOptions({ minScale, maxScale });
+
+          if (wasAtDefault) {
+            const { w, h } = getViewportSize();
+            const scaledW = img.naturalWidth * coverScale;
+            const scaledH = img.naturalHeight * coverScale;
+            const x = (w - scaledW) / 2;
+            const y = (h - scaledH) / 2;
+            panzoom.zoom(coverScale, { animate: true, duration: 250, relative: false });
+            panzoom.pan(x, y, { animate: true, duration: 250, relative: false });
+          } else {
+            let newScale = userZoomRatio * coverScale;
+            newScale = Math.min(Math.max(newScale, minScale), maxScale);
+            if (!isFinite(newScale) || newScale <= 0) return;
+            const { w, h } = getViewportSize();
+            panzoom.zoomTo(newScale, {
+              animate: true,
+              duration: 220,
+              focal: { x: w / 2, y: h / 2 }
+            });
+          }
+        } catch (e) {
+          logError('handleResize failed', e);
+          try { initPanzoom(); } catch (err) { logError('re-init after resize error', err); }
+        }
+      }
+
+      function throttledResize() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(handleResize, 180);
+      }
+
+      // ---------- رویدادهای شهرها (بدون نمایش پیام) ----------
+      function onCityPointerDown(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        const hit = e.currentTarget;
+        clickState.set(hit, {
+          startX: e.clientX,
+          startY: e.clientY,
+          pressed: true,
+          moved: false
+        });
+        hit.classList.add('is-pressed');
+      }
+
+      function onCityPointerMove(e) {
+        const hit = e.currentTarget;
+        const st = clickState.get(hit);
+        if (!st || !st.pressed) return;
+        const dx = e.clientX - st.startX;
+        const dy = e.clientY - st.startY;
+        if (Math.sqrt(dx * dx + dy * dy) > MOVE_THRESHOLD) {
+          st.moved = true;
+          hit.classList.remove('is-pressed');
+        }
+      }
+
+      function onCityPointerUp(e) {
+        const hit = e.currentTarget;
+        const st = clickState.get(hit);
+        if (!st || !st.pressed) {
+          hit.classList.remove('is-pressed');
+          clickState.delete(hit);
+          return;
+        }
+        const dx = e.clientX - st.startX;
+        const dy = e.clientY - st.startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const isClick = dist <= CLICK_THRESHOLD;
+
+        hit.classList.remove('is-pressed');
+
+        if (isClick && !st.moved) {
+          // ** اینجا هیچ کاری انجام نمی‌دهیم – پیام حذف شد **
+          // فقط برای رفع effect می‌توانیم یک انیمیشن کوچک بدون پیام داشته باشیم (اختیاری)
+          const icon = hit.querySelector('.city-icon');
+          if (icon) {
+            icon.style.transform = 'translate(-50%, -50%) rotate(45deg) scale(1.2)';
+            setTimeout(() => { icon.style.transform = ''; }, 150);
+          }
+        }
+        clickState.delete(hit);
+      }
+
+      function onCityPointerCancel(e) {
+        const hit = e.currentTarget;
+        hit.classList.remove('is-pressed');
+        clickState.delete(hit);
+      }
+
+      cityHits.forEach(hit => {
+        hit.addEventListener('pointerdown', onCityPointerDown, { passive: true });
+        hit.addEventListener('pointermove', onCityPointerMove, { passive: true });
+        hit.addEventListener('pointerup', onCityPointerUp, { passive: true });
+        hit.addEventListener('pointercancel', onCityPointerCancel, { passive: true });
+        hit.addEventListener('pointerleave', onCityPointerCancel, { passive: true });
+        hit.addEventListener('contextmenu', e => e.preventDefault());
+      });
+
+      // ---------- جلوگیری از gestureهای مرورگر ----------
+      function preventGestures(e) {
+        if (container.contains(e.target)) e.preventDefault();
+      }
+      if ('ongesturestart' in window) {
+        document.addEventListener('gesturestart', preventGestures, { passive: false });
+        document.addEventListener('gesturechange', preventGestures, { passive: false });
+        document.addEventListener('gestureend', preventGestures, { passive: false });
+      }
+
+      img.addEventListener('contextmenu', e => e.preventDefault());
+      img.addEventListener('dragstart', e => e.preventDefault());
+      container.addEventListener('contextmenu', e => {
+        if (e.target === img || wrapper.contains(e.target)) e.preventDefault();
+      });
+
+      document.addEventListener('touchmove', function (e) {
+        if (container.contains(e.target)) e.preventDefault();
+      }, { passive: false });
+
+      // ---------- بارگذاری مجدد Panzoom ----------
+      function reloadPanzoomScript(callback) {
+        if (panzoomScriptLoading) { callback(false); return; }
+        panzoomScriptLoading = true;
+        destroyPanzoom();
+        document.querySelectorAll('script[src*="panzoom"]').forEach(s => { try { s.remove(); } catch (_) {} });
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/@panzoom/panzoom@4.6.2/dist/panzoom.min.js?t=' + Date.now();
+        script.onload = () => { panzoomScriptLoading = false; callback(true); };
+        script.onerror = () => { panzoomScriptLoading = false; callback(false); };
+        document.head.appendChild(script);
+      }
+
+      // ---------- رویدادهای سراسری ----------
+      window.addEventListener('resize', throttledResize);
+      window.addEventListener('orientationchange', () => setTimeout(throttledResize, 300));
+      document.addEventListener('fullscreenchange', throttledResize);
+      document.addEventListener('webkitfullscreenchange', throttledResize);
+      document.addEventListener('visibilitychange', onVisibilityChange);
+
+      // ---------- بارگذاری تصویر ----------
+      function onImageReady() {
+        loadAttempts = 0;
+        if (initTimeoutId) { clearTimeout(initTimeoutId); initTimeoutId = null; }
+        if (!isInitializing && !destroyed) {
+          setTimeout(() => { if (!destroyed) initPanzoom(); }, 50);
+        }
+      }
+
+      img.addEventListener('load', onImageReady);
+      img.addEventListener('error', () => {
+        loadAttempts = 0;
+        logError('Image load error');
+        showLoader(false);
+        showError('نقشه پیدا نشد. لطفاً اتصال اینترنت را بررسی کنید.');
+      });
+
+      // ---------- دکمه تلاش مجدد ----------
+      retryBtn.addEventListener('click', () => {
+        if (isInitializing || destroyed) return;
+        loadAttempts = 0;
+        isUserInteracting = false;
+        needsResizeAfter = false;
+        activePointerCount = 0;
+        destroyPanzoom();
+        if (initTimeoutId) { clearTimeout(initTimeoutId); initTimeoutId = null; }
+        showLoader(true);
+        errorDiv.style.display = 'none';
+
+        function doReload() {
+          const newSrc = addOrReplaceCacheBust(img.src.split('#')[0]);
+          img.src = newSrc;
+          initTimeoutId = setTimeout(() => {
+            if (!panzoom && errorDiv.style.display !== 'block') {
+              if (img.complete && img.naturalWidth > 0) initPanzoom();
+              else showError('بارگذاری نقشه طولانی شد. لطفاً دوباره تلاش کنید.');
+            }
+          }, 8000);
+        }
+
+        if (typeof Panzoom === 'undefined') {
+          reloadPanzoomScript(ok => {
+            if (ok) doReload();
+            else { showLoader(false); showError('کتابخانه نقشه بارگذاری نشد.'); }
+          });
+        } else {
+          doReload();
+        }
+      });
+
+      // ---------- تلگرام ----------
+      try {
+        if (window.Telegram && window.Telegram.WebApp) {
+          const tg = window.Telegram.WebApp;
+          try { tg.ready(); } catch (_) {}
+          try { tg.expand(); } catch (_) {}
+          try {
+            if (typeof tg.setHeaderColor === 'function') tg.setHeaderColor('#0f0f14');
+            if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor('#0f0f14');
+          } catch (_) {}
+          try {
+            if (typeof tg.requestFullscreen === 'function') {
+              tg.requestFullscreen().catch(err => logError('requestFullscreen rejected', err));
+            }
+          } catch (_) {}
+          try {
+            if (typeof tg.onEvent === 'function') {
+              tg.onEvent('viewportChanged', throttledResize);
+              tg.onEvent('safeAreaChanged', throttledResize);
+              tg.onEvent('contentSafeAreaChanged', throttledResize);
+            }
+          } catch (_) {}
+          try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (_) {}
+        }
+      } catch (e) {}
+
+      // ---------- شروع ----------
+      showLoader(true);
+
+      if (typeof Panzoom === 'undefined') {
+        reloadPanzoomScript(ok => {
+          if (!ok) { showLoader(false); showError('کتابخانه نقشه بارگذاری نشد.'); return; }
+          if (img.complete && img.naturalWidth > 0) setTimeout(initPanzoom, 60);
+        });
+      } else {
+        if (img.complete && img.naturalWidth > 0) setTimeout(initPanzoom, 60);
+        else if (img.complete && !img.naturalWidth) { showLoader(false); showError('نقشه قابل بارگذاری نیست.'); }
+      }
+
+      initTimeoutId = setTimeout(() => {
+        if (destroyed) return;
+        if (!panzoom && errorDiv.style.display !== 'block' && img.complete && img.naturalWidth > 0) {
+          initPanzoom();
+        }
+      }, 6000);
+
+    })();
+  </script>
+</body>
+  </html>
