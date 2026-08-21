@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>نقشه بازی</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/@panzoom/panzoom@4.6.2/dist/panzoom.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111;
+      touch-action: none;
+    }
+    #map-container {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+    #map {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: none;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-drag: none;
+      transform-origin: 0 0;
+    }
+    #map:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body>
+  <div id="map-container">
+    <img id="map" src="https://i.ibb.co/Y4NtgbRZ/map.jpg" alt="نقشه بازی">
+  </div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    tg.requestFullscreen();
+    tg.disableVerticalSwipes();
+
+    const img = document.getElementById('map');
+    const container = document.getElementById('map-container');
+
+    // صبر می‌کنیم تا تصویر کامل لود بشه
+    img.onload = function() {
+      const imgWidth = img.naturalWidth;
+      const imgHeight = img.naturalHeight;
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+
+      // محاسبه مقیاس برای اینکه نقشه کل صفحه رو بپوشونه (Cover)
+      const scaleX = screenWidth / imgWidth;
+      const scaleY = screenHeight / imgHeight;
+      const coverScale = Math.max(scaleX, scaleY); // بزرگ‌ترین مقیاس = کل صفحه پر بشه
+
+      // راه‌اندازی Panzoom
+      const panzoom = Panzoom(img, {
+        startScale: coverScale,       // از اول با مقیاس Cover شروع کن
+        minScale: coverScale * 0.8,   // حداقل زوم (کمی کوچیک‌تر از Cover)
+        maxScale: coverScale * 4,     // حداکثر زوم
+        contain: 'outside',
+        cursor: 'grab',
+        // برای اینکه موقع زوم نرم باشه
+        animate: true
+      });
+
+      // زوم با چرخ موس (برای تست در دسکتاپ)
+      container.addEventListener('wheel', panzoom.zoomWithWheel);
+    };
+
+    // اگر تصویر از قبل کش شده بود
+    if (img.complete) {
+      img.onload();
+    }
+  </script>
+</body>
+</html>
