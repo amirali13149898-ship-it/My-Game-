@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>نقشه بازی</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/@panzoom/panzoom@4.6.2/dist/panzoom.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #111;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    #map-container {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      touch-action: none;
+      position: relative;
+      background: #222;
+    }
+
+    #map-wrapper {
+      position: relative;
+      display: block;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+
+    #map {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: none;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      vertical-align: top;
+    }
+
+    #map.hidden { display: none; }
+
+    .city-icon {
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      background: #e63946;
+      transform: translate(-50%, -50%) rotate(45deg);
+      border: 2.5px solid #fff;
+      border-radius: 3px;
+      box-shadow: 0 0 14px rgba(230, 57, 70, 0.75);
+      z-index: 10;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .city-icon:active {
+      transform: translate(-50%, -50%) rotate(45deg) scale(0.88);
+      box-shadow: 0 0 8px rgba(230, 57, 70, 0.9);
+    }
+    .city-icon::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 7px;
+      height: 7px;
+      background: #fff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+    }
+
+    #error-msg {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      background: rgba(0,0,0,0.85);
+      padding: 25px 30px;
+      border-radius: 12px;
+      text-align: center;
+      font-family: sans-serif;
+      display: none;
+      z-index: 30;
+      max-width: 85%;
+      direction: rtl;
+      backdrop-filter: blur(4px);
+      border: 1px solid #555;
+    }
+    #error-msg button {
+      margin-top: 15px;
+      padding: 10px 28px;
+      background: #4CAF50;
+      border: none;
+      color: #fff;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="map-container">
+    <div id="map-wrapper">
+      <img id="map" src="https://i.ibb.co/Y4NtgbRZ/map.jpg" alt="نقشه بازی">
+
+      <!-- وسط -->
+      <div class="city-icon" style="left: 50%; top: 45%;" data-city="1"></div>
+      <!-- بالا -->
+      <div class="city-icon" style="left: 50%; top: 11%;" data-city="2"></div>
+      <!-- پایین (هم‌راستا با بالا) -->
+      <div class="city-icon" style="left: 50%; top: 85%;" data-city="3"></div>
+      <!-- چپ -->
+      <div class="city-icon" style="left: 12.5%; top: 47%;" data-city="4"></div>
+      <!-- راست -->
+      <div class="city-icon" style="left: 87.3%; top: 47%;" data-city="5"></div>
+    </div>
+
+    <div id="error-msg">
+      <span id="error-text">خطا در بارگذاری نقشه</span>
+      <br><button id="retry-btn">تلاش مجدد</button>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      const img = document.getElementById('map');
+      const wrapper = document.getElementById('map-wrapper');
+      const container = document.getElementById('map-container');
+      const errorDiv = document.getElementById('error-msg');
+      const errorText = document.getElementById('error-text');
+      const retryBtn = document.getElementById('retry-btn');
+      const cityIcons = document.querySelectorAll('.city-icon');
+
+      let panzoom = null;
+      let loadAttempts = 0;
+      const MAX_ATTEMPTS = 3;
+      let coverScale = 1;
+      let isUserZooming = false;
+      let resizeTimer = null;
+      let initTimeoutId = null;
+      let isInitializing = false;
+      let needsResizeAfterZoom = false;
+
+      // --- توابع کمکی ---
+      function showError(msg) {
+        img.classList.add('hidden');
+        cityIcons.forEach(icon => icon.style.display = 'none');
+        errorText.textContent = msg || 'خطا در بارگذاری نقشه';
+        errorDiv.style.display = 'block';
+      }
+
+      function hideError() {
+        img.classList.remove('hidden');
+        cityIcons.forEach(icon => icon.style.display = '');
+        errorDiv.style.display = 'none';
+      }
+
+      function addQueryParam(url, key, value) {
+        const hasQuery = url.includes('?');
+        const separator = hasQuery ? '&' : '?';
+        return url + separator + key + '=' + encodeURIComponent(value);
+      }
+
+      function calcCoverScale() {
+        if (!img.naturalWidth || !img.naturalHeight) return 1;
+        return Math.max(window.innerWidth / img.naturalWidth, window.innerHeight / img.naturalHeight);
+      }
+
+      // جلوگیری از gesture مرورگر
+      function gestureHandler(e) {
+        if (container.contains(e.target)) e.preventDefault();
+      }
+
+      // --- پاک‌سازی کامل ---
+      function destroyPanzoom() {
+        if (panzoom) {
+          try {
+            panzoom.destroy();
+          } catch (e) {}
+          panzoom = null;
+        }
+        // حذف listenerهای قبلی
+        wrapper.removeEventListener('panzoomstart', setZooming);
+        wrapper.removeEventListener('panzoomzoom', setZooming);
+        wrapper.removeEventListener('panzoomend', onPanzoomEnd);
+        container.removeEventListener('pointerdown', setZooming);
+        container.removeEventListener('pointerup', clearZooming);
+        container.removeEventListener('pointercancel', clearZooming);
+        container.removeEventListener('touchend', clearZooming);
+        container.removeEventListener('touchcancel', clearZooming);
+        container.removeEventListener('touchmove', preventTouchMove);
+      }
+
+      function setZooming() {
+        isUserZooming = true;
+      }
+
+      function clearZooming() {
+        isUserZooming = false;
+        if (needsResizeAfterZoom) {
+          needsResizeAfterZoom = false;
+          handleResize();
+        }
+      }
+
+      function onPanzoomEnd() {
+        clearZooming();
+      }
+
+      function preventTouchMove(e) {
+        if (container.contains(e.target)) e.preventDefault();
+      }
+
+      // --- راه‌اندازی Panzoom ---
+      function initPanzoom() {
+        if (isInitializing) return;
+        isInitializing = true;
+
+        if (initTimeoutId) {
+          clearTimeout(initTimeoutId);
+          initTimeoutId = null;
+        }
+
+        destroyPanzoom();
+
+        if (!img.naturalWidth || !img.naturalHeight) {
+          if (loadAttempts < MAX_ATTEMPTS) {
+            loadAttempts++;
+            isInitializing = false;
+            initTimeoutId = setTimeout(initPanzoom, 1200);
+          } else {
+            showError('نقشه بارگذاری نشد. لطفاً دوباره تلاش کنید.');
+            isInitializing = false;
+          }
+          return;
+        }
+
+        loadAttempts = 0;
+        hideError();
+
+        coverScale = calcCoverScale();
+        if (coverScale < 0.1) coverScale = 1;
+
+        wrapper.style.width = img.naturalWidth + 'px';
+        wrapper.style.height = img.naturalHeight + 'px';
+
+        try {
+          const minScale = coverScale * 0.5;
+          const maxScale = Math.max(coverScale * 5, 12);
+
+          panzoom = Panzoom(wrapper, {
+            startScale: coverScale,
+            minScale: minScale,
+            maxScale: maxScale,
+            contain: 'outside',
+            cursor: 'grab',
+            touchAction: 'none',
+            animate: false,          // بدون انیمیشن اولیه
+            duration: 150,
+            wheel: true
+          });
+
+          // مرکز کردن نقشه
+          const centerX = (img.naturalWidth * coverScale - window.innerWidth) / 2;
+          const centerY = (img.naturalHeight * coverScale - window.innerHeight) / 2;
+          panzoom.pan(-centerX, -centerY, { animate: false });
+
+          window.panzoom = panzoom;
+
+          // ثبت listenerها (فقط یک بار برای این instance)
+          wrapper.addEventListener('panzoomstart', setZooming);
+          wrapper.addEventListener('panzoomzoom', setZooming);
+          wrapper.addEventListener('panzoomend', onPanzoomEnd);
+
+          container.addEventListener('pointerdown', setZooming, { passive: true });
+          container.addEventListener('pointerup', clearZooming, { passive: true });
+          container.addEventListener('pointercancel', clearZooming, { passive: true });
+          container.addEventListener('touchend', clearZooming, { passive: true });
+          container.addEventListener('touchcancel', clearZooming, { passive: true });
+          container.addEventListener('touchmove', preventTouchMove, { passive: false });
+
+        } catch (e) {
+          showError('خطا در راه‌اندازی نقشه: ' + e.message);
+          panzoom = null;
+        } finally {
+          isInitializing = false;
+        }
+      }
+
+      // --- مدیریت تغییر سایز ---
+      function handleResize() {
+        if (!panzoom) return;
+
+        if (isUserZooming) {
+          needsResizeAfterZoom = true;
+          return;
+        }
+
+        const newCover = calcCoverScale();
+        if (Math.abs(newCover - coverScale) < 0.015) return;
+
+        const currentScale = panzoom.getScale();
+        const userZoomRatio = currentScale / coverScale;
+        coverScale = newCover;
+
+        const minScale = coverScale * 0.5;
+        const maxScale = Math.max(coverScale * 5, 12);
+        let newScale = userZoomRatio * coverScale;
+        newScale = Math.min(Math.max(newScale, minScale), maxScale);
+
+        // آپدیت گزینه‌ها
+        panzoom.setOptions({
+          minScale: minScale,
+          maxScale: maxScale
+        });
+
+        panzoom.zoomTo(newScale, {
+          animate: true,
+          duration: 200,
+          focal: { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+        });
+      }
+
+      function throttledResize() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(handleResize, 280);
+      }
+
+      // --- رویدادها ---
+      window.addEventListener('resize', throttledResize);
+      document.addEventListener('fullscreenchange', throttledResize);
+      document.addEventListener('webkitfullscreenchange', throttledResize);
+
+      document.addEventListener('gesturestart', gestureHandler, { passive: false });
+      document.addEventListener('gesturechange', gestureHandler, { passive: false });
+      document.addEventListener('gestureend', gestureHandler, { passive: false });
+
+      img.addEventListener('load', function() {
+        loadAttempts = 0;
+        if (initTimeoutId) clearTimeout(initTimeoutId);
+        if (!isInitializing) initPanzoom();
+      });
+
+      img.addEventListener('error', function() {
+        showError('نقشه پیدا نشد. لطفاً اتصال اینترنت را بررسی کنید.');
+      });
+
+      // دکمه تلاش مجدد (همیشه کار می‌کند)
+      retryBtn.addEventListener('click', function() {
+        if (isInitializing) return;
+        loadAttempts = 0;
+        destroyPanzoom();
+        hideError();
+        if (initTimeoutId) clearTimeout(initTimeoutId);
+        const baseSrc = img.src.split('?')[0];
+        img.src = addQueryParam(baseSrc, 't', Date.now());
+      });
+
+      // کلیک روی شهرها
+      cityIcons.forEach(icon => {
+        icon.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const cityId = this.getAttribute('data-city');
+          alert('وارد شهر شماره ' + cityId + ' شدی!');
+        });
+      });
+
+      // شروع اولیه
+      if (typeof Panzoom === 'undefined') {
+        showError('کتابخانه نقشه بارگذاری نشد. اتصال اینترنت را بررسی کنید.');
+      } else {
+        try {
+          if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+            if (typeof tg.requestFullscreen === 'function') {
+              try {
+                const p = tg.requestFullscreen();
+                if (p && typeof p.catch === 'function') p.catch(() => {});
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+
+        if (img.complete && img.naturalWidth > 0) {
+          initPanzoom();
+        } else if (img.complete && !img.naturalWidth) {
+          showError('نقشه قابل بارگذاری نیست.');
+        }
+
+        initTimeoutId = setTimeout(function() {
+          if (!panzoom && errorDiv.style.display !== 'block' && img.complete && img.naturalWidth > 0) {
+            initPanzoom();
+          }
+        }, 3500);
+      }
+
+    })();
+  </script>
+</body>
+</html>
