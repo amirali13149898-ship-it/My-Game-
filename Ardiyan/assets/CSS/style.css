@@ -1,3 +1,28 @@
+/* ===== فونت‌های محلی (بارگذاری آفلاین) ===== */
+
+@font-face {
+    font-family: 'Lalezar';
+    src: url('../fonts/Lalezar.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Vazirmatn';
+    src: url('../fonts/Vazirmatn.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Vazirmatn';
+    src: url('../fonts/Vazirmatn-Bold.woff2') format('woff2');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
 /* ===== متغیرها و ریست ===== */
 :root {
   --fire-1: #ffe082;
