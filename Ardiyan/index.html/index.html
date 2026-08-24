@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>آردیان</title>
   <link rel="stylesheet" href="assets/css/style.css">
-  <script src="assets/js/vendor/panzoom.min.js"></script>
+  
+  <!-- بارگذاری Panzoom از اینترنت (آفلاین نیست) -->
+  <script src="https://unpkg.com/@panzoom/panzoom@4.6.2/dist/panzoom.min.js"></script>
 </head>
 <body>
 
-  <!-- صفحه نام -->
+  <!-- ===== صفحه نام ===== -->
   <div class="screen active" id="nameScreen">
     <div class="stage">
       <div class="fx" id="fx"></div>
@@ -65,7 +67,7 @@
     </div>
   </div>
 
-  <!-- صفحه نژاد -->
+  <!-- ===== صفحه نژاد ===== -->
   <div class="screen" id="raceScreen">
     <div class="game-container" id="gameContainer">
       <div class="player-name-badge" id="playerNameBadge">ماجراجو</div>
@@ -85,7 +87,7 @@
     </div>
   </div>
 
-  <!-- صفحه جادو -->
+  <!-- ===== صفحه جادو ===== -->
   <div class="screen" id="magicScreen">
     <div class="magic-container" id="magicContainer">
       <button class="back-btn" id="backToRaceBtn">بازگشت</button>
@@ -131,7 +133,7 @@
     </div>
   </div>
 
-  <!-- صفحه نقشه -->
+  <!-- ===== صفحه نقشه ===== -->
   <div class="screen" id="mapScreen">
     <div id="map-container">
       <div class="player-name-badge" id="mapPlayerBadge">ماجراجو</div>
@@ -145,9 +147,11 @@
     </div>
   </div>
 
+  <!-- ===== توست ===== -->
   <div id="toast" class="toast" role="status"></div>
 
+  <!-- ===== فایل اصلی جاوااسکریپت (ماژول) ===== -->
   <script type="module" src="assets/js/main.js"></script>
 
 </body>
-  </html>
+          </html>
