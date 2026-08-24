@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>آردیان</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="https://unpkg.com/@panzoom/panzoom@4.6.2/dist/panzoom.min.js"></script>
+</head>
+<body>
+
+  <!-- ===== گرادیان ستاره (برای ستاره‌های SVG) ===== -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="starGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0"   stop-color="#f4f7fc"/>
+        <stop offset=".55" stop-color="#b9c2d4"/>
+        <stop offset="1"   stop-color="#6d7688"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <!-- ===== صفحه ۱: نام ===== -->
+  <div class="screen active" id="nameScreen">
+    <div class="stage">
+      <div class="fx" id="fx"></div>
+      <div class="card">
+        <div class="card-inner">
+          <div class="ornament">
+            <span class="o-line line-right"></span>
+            <svg class="o-star" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 0C12.9 7.2 15.6 10.3 24 12 15.6 13.7 12.9 16.8 12 24 11.1 16.8 8.4 13.7 0 12 8.4 10.3 11.1 7.2 12 0Z" fill="url(#starGrad)"/>
+            </svg>
+            <span class="o-line line-left"></span>
+          </div>
+
+          <h1 class="title">درود به بازی</h1>
+          <p class="subtitle"><span class="name">آردیان</span><span class="welcome">خوش آمدید.</span></p>
+
+          <div class="input-box">
+            <input id="gameInput" class="game-input" type="text" autocomplete="off" placeholder="لطفا نام خود را وارد کنید..." maxlength="20">
+          </div>
+
+          <button id="nameConfirmBtn" class="confirm-button" type="button">
+            <svg viewBox="0 0 520 190" role="img" aria-labelledby="btnTitle">
+              <title id="btnTitle">تأیید</title>
+              <defs>
+                <linearGradient id="panelGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%"   stop-color="#ff8a1e"/>
+                  <stop offset="45%"  stop-color="#a52d05"/>
+                  <stop offset="100%" stop-color="#4c1004"/>
+                </linearGradient>
+                <linearGradient id="borderGradient" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%"   stop-color="#fff078"/>
+                  <stop offset="25%"  stop-color="#ff9c19"/>
+                  <stop offset="60%"  stop-color="#ff4d00"/>
+                  <stop offset="100%" stop-color="#ffd05a"/>
+                </linearGradient>
+                <filter id="outer-glow" x="-50%" y="-100%" width="200%" height="300%">
+                  <feGaussianBlur stdDeviation="7" result="blur"/>
+                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+                <filter id="text-glow" x="-50%" y="-100%" width="200%" height="300%">
+                  <feGaussianBlur stdDeviation="4" result="blur"/>
+                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+
+              <path class="outer-glow"
+                d="M48 20 L472 20 L493 42 L486 60 L500 95 L486 130 L493 148 L472 170 L48 170 L27 148 L34 130 L20 95 L34 60 L27 42 Z"
+                fill="none" stroke="#ff6500" stroke-width="7" opacity=".75" filter="url(#outer-glow)"/>
+              <path class="main-panel"
+                d="M55 25 L465 25 L485 45 L478 63 L490 95 L478 127 L485 145 L465 165 L55 165 L35 145 L42 127 L30 95 L42 63 L35 45 Z"
+                fill="url(#panelGradient)" stroke="url(#borderGradient)" stroke-width="4" filter="url(#outer-glow)"/>
+              <path
+                d="M65 37 L455 37 L472 53 L465 70 L476 95 L465 120 L472 137 L455 153 L65 153 L48 137 L55 120 L44 95 L55 70 L48 53 Z"
+                fill="none" stroke="#ffbd43" stroke-width="2" opacity=".9"/>
+              <path d="M83 30 H437 M83 160 H437" stroke="#ffe26b" stroke-width="2" opacity=".6"/>
+              <text x="260" y="98" class="button-text">تأیید</text>
+            </svg>
+          </button>
+
+          <div class="ornament bottom">
+            <span class="o-line line-right"></span>
+            <svg class="o-star" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 0C12.9 7.2 15.6 10.3 24 12 15.6 13.7 12.9 16.8 12 24 11.1 16.8 8.4 13.7 0 12 8.4 10.3 11.1 7.2 12 0Z" fill="url(#starGrad)"/>
+            </svg>
+            <span class="o-line line-left"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== صفحه نژاد ===== -->
+  <div class="screen" id="raceScreen">
+    <div class="game-container" id="gameContainer">
+      <div class="player-name-badge" id="playerNameBadge">ماجراجو</div>
+      <div class="race-panel">
+        <button class="race-btn" data-race="انسان">انسان</button>
+        <button class="race-btn" data-race="دروف">دروف</button>
+        <button class="race-btn" data-race="نیمه انسان">نیمه انسان</button>
+        <button class="race-btn" data-race="نیمه دارگون">نیمه دارگون</button>
+        <button class="race-btn" data-race="الف">الف</button>
+        <button class="race-btn" data-race="فرشته">فرشته</button>
+      </div>
+      <div class="gender-box" id="genderBox">
+        <button class="gender-btn" data-gender="زن">زن</button>
+        <button class="gender-btn" data-gender="مرد">مرد</button>
+      </div>
+      <button class="race-confirm-btn" id="raceConfirmBtn" disabled>تأیید و ادامه</button>
+    </div>
+  </div>
+
+  <!-- ===== صفحه جادو ===== -->
+  <div class="screen" id="magicScreen">
+    <div class="magic-container" id="magicContainer">
+      <button class="back-btn" id="backToRaceBtn">بازگشت</button>
+      <div class="magic-list">
+        <button class="magic-btn" data-magic="آتش">🔥 آتش</button>
+        <button class="magic-btn" data-magic="آب">💧 آب</button>
+        <button class="magic-btn" data-magic="باد">🌪️ باد</button>
+        <button class="magic-btn" data-magic="خاک">🪨 خاک</button>
+        <button class="magic-btn" data-magic="نور">☀️ نور</button>
+        <button class="magic-btn" data-magic="تاریکی">🌑 تاریکی</button>
+      </div>
+      <div class="magic-info" id="magicInfo">جادوی مورد نظر خود را انتخاب کنید</div>
+      <button class="magic-confirm-btn" id="magicConfirmBtn" type="button" disabled>
+        <svg viewBox="0 0 520 190" role="img" aria-labelledby="magicConfirmTitle">
+          <title id="magicConfirmTitle">تأیید</title>
+          <defs>
+            <linearGradient id="magicPanelGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#ff7213"/>
+              <stop offset="45%" stop-color="#a52d05"/>
+              <stop offset="100%" stop-color="#4c1004"/>
+            </linearGradient>
+            <linearGradient id="magicBorderGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#fff078"/>
+              <stop offset="25%" stop-color="#ff9c19"/>
+              <stop offset="60%" stop-color="#ff4d00"/>
+              <stop offset="100%" stop-color="#ffd05a"/>
+            </linearGradient>
+            <filter id="magicOuterGlow" x="-50%" y="-100%" width="200%" height="300%">
+              <feGaussianBlur stdDeviation="7" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="magicTextGlow" x="-50%" y="-100%" width="200%" height="300%">
+              <feGaussianBlur stdDeviation="4" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <path class="outer-glow"
+            d="M48 20 L472 20 L493 42 L486 60 L500 95 L486 130 L493 148 L472 170 L48 170 L27 148 L34 130 L20 95 L34 60 L27 42 Z"
+            fill="none" stroke="#ff6500" stroke-width="7" opacity=".75" filter="url(#magicOuterGlow)"/>
+          <path class="main-panel"
+            d="M55 25 L465 25 L485 45 L478 63 L490 95 L478 127 L485 145 L465 165 L55 165 L35 145 L42 127 L30 95 L42 63 L35 45 Z"
+            fill="url(#magicPanelGrad)" stroke="url(#magicBorderGrad)" stroke-width="4" filter="url(#magicOuterGlow)"/>
+          <path
+            d="M65 37 L455 37 L472 53 L465 70 L476 95 L465 120 L472 137 L455 153 L65 153 L48 137 L55 120 L44 95 L55 70 L48 53 Z"
+            fill="none" stroke="#ffbd43" stroke-width="2" opacity=".9"/>
+          <path d="M83 30 H437 M83 160 H437" stroke="#ffe26b" stroke-width="2" opacity=".6"/>
+          <text x="260" y="98" class="button-text">تأیید</text>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== صفحه نقشه ===== -->
+  <div class="screen" id="mapScreen">
+    <div id="map-container">
+      <div class="player-name-badge" id="mapPlayerBadge">ماجراجو</div>
+      <div id="map-wrapper">
+        <img id="map" alt="نقشه بازی">
+      </div>
+      <div id="error-msg">
+        <span id="error-text">خطا در بارگذاری نقشه</span>
+        <br><button id="retry-btn">تلاش مجدد</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- توست -->
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- ===== ماژولار جاوااسکریپت ===== -->
+  <script type="module" src="assets/js/main.js"></script>
+
+</body>
+</html>
