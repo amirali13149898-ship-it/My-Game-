@@ -79,6 +79,6 @@ export const RACE_MAPS = {
   }
 };
 
-// این دو تا قبلاً نبود و باعث کرش می‌شد
+// ================== اضافه شده برای جلوگیری از کرش ==================
 export const CASTLE_BG = "assets/images/ui/castle-background.jpg";
 export const DEFAULT_BG = "assets/images/ui/default-bg.jpg";
