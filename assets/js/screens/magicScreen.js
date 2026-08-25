@@ -1,4 +1,4 @@
-import { $, \], showScreen, setBackground } from '../utils/dom.js';
+import { $, \[ , showScreen, setBackground } from '../utils/dom.js';
 import { showToast } from '../utils/toast.js';
 import { savePlayerData } from '../utils/storage.js';
 import { MAGIC_IMAGES, DEFAULT_BG } from '../config.js';
@@ -8,7 +8,7 @@ import { playClick } from '../utils/sound.js';
 let selectedMagic = null;
 
 export function initMagicScreen() {
-  const magicBtns = $$('.magic-btn');
+  const magicBtns = \]('.magic-btn');
   const confirmBtn = $('#magicConfirmBtn');
   const magicInfo = $('#magicInfo');
   const container = $('#magicContainer');
