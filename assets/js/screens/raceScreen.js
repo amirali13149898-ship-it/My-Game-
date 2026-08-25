@@ -1,4 +1,4 @@
-import { $, \[ , showScreen, setBackground } from '../utils/dom.js';
+import { $, \], showScreen, setBackground } from '../utils/dom.js';
 import { showToast } from '../utils/toast.js';
 import { savePlayerData } from '../utils/storage.js';
 import { RACE_IMAGES, CASTLE_BG } from '../config.js';
@@ -8,8 +8,8 @@ let selectedRace = null;
 let selectedGender = null;
 
 export function initRaceScreen() {
-  const raceBtns = \]('.race-btn');
-  const genderBtns = \[ ('.gender-btn');
+  const raceBtns = \[ ('.race-btn');
+  const genderBtns = \]('.gender-btn');
   const genderBox = $('#genderBox');
   const confirmBtn = $('#raceConfirmBtn');
   const container = $('#gameContainer');
@@ -60,8 +60,8 @@ export function initRaceScreen() {
 }
 
 export function resetRaceScreen() {
-  const raceBtns = \]('.race-btn');
-  const genderBtns = \[ ('.gender-btn');
+  const raceBtns = \[ ('.race-btn');
+  const genderBtns = \]('.gender-btn');
   const genderBox = $('#genderBox');
   const confirmBtn = $('#raceConfirmBtn');
   const container = $('#gameContainer');
@@ -70,6 +70,3 @@ export function resetRaceScreen() {
   genderBtns.forEach(b => b.classList.remove('selected'));
   if (genderBox) genderBox.style.display = 'none';
   if (confirmBtn) confirmBtn.disabled = true;
-  selectedRace = selectedGender = null;
-  if (container) container.style.backgroundImage = `url('${CASTLE_BG}')`;
-}
