@@ -1,3 +1,4 @@
+// assets/js/screens/nameScreen.js
 import { $, showScreen } from '../utils/dom.js';
 import { showToast } from '../utils/toast.js';
 import { savePlayerData } from '../utils/storage.js';
@@ -25,14 +26,18 @@ export function initNameScreen() {
       return;
     }
 
+    // ذخیره
     savePlayerData({ playerName: name });
 
+    // انیمیشن دکمه
     btn.classList.remove('pulse');
     void btn.offsetWidth;
     btn.classList.add('pulse');
 
+    // پیام
     showToast(`درود ${name}! در حال ورود به دنیای آردیان...`);
 
+    // رفتن به صفحه بعدی
     setTimeout(() => {
       const badge = document.getElementById('playerNameBadge');
       if (badge) badge.textContent = name;
@@ -41,10 +46,7 @@ export function initNameScreen() {
   }
 
   btn.addEventListener('click', confirm);
-
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      confirm();
-    }
+    if (e.key === 'Enter') confirm();
   });
 }
