@@ -14,7 +14,7 @@ const saved = getPlayerDataAll();
 if (saved.name) {
   const badge = document.getElementById('playerNameBadge');
   if (badge) badge.textContent = saved.name;
-  
+
   if (saved.race && saved.gender && saved.magic) {
     document.getElementById('mapPlayerBadge').textContent = saved.name;
     showScreen('mapScreen');
