@@ -1,7 +1,6 @@
 import { $, showScreen } from '../utils/dom.js';
 import { showToast } from '../utils/toast.js';
 import { savePlayerData } from '../utils/storage.js';
-import { playClick } from '../utils/sound.js';
 
 export function initNameScreen() {
   const input = $('#gameInput');
@@ -26,25 +25,14 @@ export function initNameScreen() {
       return;
     }
 
-    // پخش صدا
-    try {
-      playClick();
-    } catch (e) {
-      console.warn('خطا در پخش صدا:', e);
-    }
-
-    // ذخیره نام
     savePlayerData({ playerName: name });
 
-    // انیمیشن دکمه
     btn.classList.remove('pulse');
     void btn.offsetWidth;
     btn.classList.add('pulse');
 
-    // پیام خوش‌آمدگویی
     showToast(`درود ${name}! در حال ورود به دنیای آردیان...`);
 
-    // رفتن به صفحه بعدی
     setTimeout(() => {
       const badge = document.getElementById('playerNameBadge');
       if (badge) badge.textContent = name;
@@ -52,7 +40,6 @@ export function initNameScreen() {
     }, 1600);
   }
 
-  // رویدادها
   btn.addEventListener('click', confirm);
 
   input.addEventListener('keydown', (e) => {
