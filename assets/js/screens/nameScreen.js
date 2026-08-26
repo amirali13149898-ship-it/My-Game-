@@ -1,4 +1,3 @@
-// assets/js/screens/nameScreen.js
 import { $, showScreen } from '../utils/dom.js';
 import { showToast } from '../utils/toast.js';
 import { savePlayerData } from '../utils/storage.js';
@@ -7,37 +6,17 @@ export function initNameScreen() {
   const input = $('#gameInput');
   const btn = $('#nameConfirmBtn');
 
-  if (!input || !btn) {
-    console.error('المنت‌های صفحه نام پیدا نشدند');
-    return;
-  }
-
   function confirm() {
     const name = input.value.trim();
-
-    if (!name) {
-      showToast('لطفاً نام خود را وارد کنید');
-      input.focus();
-      return;
-    }
-
-    if (name.length < 2) {
-      showToast('نام باید حداقل ۲ حرف باشد');
-      return;
-    }
-
-    // ذخیره
+    if (!name) { showToast('لطفاً نام خود را وارد کنید'); input.focus(); return; }
+    if (name.length < 2) { showToast('نام باید حداقل ۲ حرف باشد'); return; }
+    
     savePlayerData({ playerName: name });
-
-    // انیمیشن دکمه
     btn.classList.remove('pulse');
     void btn.offsetWidth;
     btn.classList.add('pulse');
-
-    // پیام
     showToast(`درود ${name}! در حال ورود به دنیای آردیان...`);
-
-    // رفتن به صفحه بعدی
+    
     setTimeout(() => {
       const badge = document.getElementById('playerNameBadge');
       if (badge) badge.textContent = name;
@@ -46,7 +25,8 @@ export function initNameScreen() {
   }
 
   btn.addEventListener('click', confirm);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') confirm();
-  });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') confirm(); });
+
+  const saved = localStorage.getItem('ardiyan_playerName');
+  if (saved) input.value = saved;
 }
