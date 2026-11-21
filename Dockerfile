@@ -1,7 +1,9 @@
-FROM golang:1.24-alpine AS build
+FROM golang:alpine AS build
 WORKDIR /src
 COPY . .
-# `go mod tidy` resolves modernc.org/sqlite and writes go.sum if it is not committed yet.
+# `go mod tidy` resolves modernc.org/sqlite + pgx and writes go.sum if it is not committed yet.
+# golang:alpine (latest) because the newest driver versions need a newer Go than 1.24.
+ENV GOTOOLCHAIN=auto
 RUN go mod tidy && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/ardian ./cmd/ardian
 
 FROM alpine:3.20
