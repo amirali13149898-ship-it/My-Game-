@@ -10,4 +10,6 @@ COPY --from=build /out/ardian /usr/local/bin/ardian
 COPY --from=build /src/assets /assets
 # Mount a Railway Volume at /data so the SQLite file survives deploys.
 ENV DB_PATH=/data/ardian.db ASSETS_DIR=/assets
+# Keep the footprint tiny on free tiers: one OS thread of Go scheduling, GC earlier, soft memory cap.
+ENV GOMAXPROCS=1 GOGC=50 GOMEMLIMIT=100MiB
 CMD ["ardian"]

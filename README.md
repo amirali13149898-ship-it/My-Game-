@@ -2,23 +2,38 @@
 
 ## اجرا
 ```bash
-go mod tidy                      # بار اول: modernc.org/sqlite و go.sum رو می‌سازه (go.sum رو کامیت کن)
+go mod tidy                      # بار اول: درایورهای sqlite/pgx و go.sum رو می‌سازه (go.sum رو کامیت کن)
 cp .env.example .env && export $(grep -v '^#' .env | cut -d' ' -f1 | xargs)
 go test ./... && go run ./cmd/ardian
 ```
 
+## دیتابیس: Supabase (Postgres) یا SQLite
+بات دو دیتابیس رو می‌شناسه و با متغیر `DATABASE_URL` انتخاب می‌کنه:
+- **`DATABASE_URL` ست باشه** (آدرس `postgresql://...`) ← Postgres (Supabase). جدول‌ها و migrationها اولین اجرا خودکار ساخته می‌شن.
+- **ست نباشه** ← فایل SQLite (`DB_PATH`)، مناسب اجرای لوکال.
+
+### راه‌اندازی Supabase
+1. تو supabase.com یه پروژه بساز و رمز دیتابیس رو یادداشت کن.
+2. بالای صفحه **Connect** ← **Session pooler** (پورت **۵۴۳۲**) ← آدرس رو کپی کن.
+   - Session pooler رو بزن، نه Direct connection: آدرس Direct فقط IPv6 داره و ممکنه از Railway وصل نشه.
+   - اگه رمزت کاراکتر خاص داره (`@ : / # %`) تو آدرس باید URL-encode بشه (مثلاً `@` ← `%40`).
+   - Transaction pooler (پورت ۶۵۴۳) هم کار می‌کنه؛ بات خودش حالت `simple_protocol` رو ست می‌کنه.
+3. این آدرس رو تو Railway به‌عنوان متغیر `DATABASE_URL` بذار. **Volume لازم نیست.**
+4. امنیت: migration سوم روی همهٔ جدول‌ها RLS فعال می‌کنه (بدون policy) تا Data API سوپابیس با کلید `anon` به دیتای بازی دسترسی نداشته باشه؛ بات با نقش `postgres` وصل می‌شه و تحت‌تأثیر نیست. این رو خاموش نکن.
+5. بکاپ: Supabase خودش بکاپ داره (بکاپ‌های خودکار طبق پلن). بکاپ زمان‌بندی‌شدهٔ بات فقط برای SQLite کار می‌کنه و با Postgres خودش رو غیرفعال می‌کنه.
+
 ## دیپلوی روی Railway
 1. ریپو رو روی GitHub بذار و تو Railway «Deploy from GitHub repo» بزن (Dockerfile خودکار شناخته می‌شه).
-2. **Volume** بساز و روی `/data` مانت کن (بدون این، دیتابیس با هر دیپلوی پاک می‌شه).
-3. Variables: `BOT_TOKEN`، `ADMIN_ID` (و اختیاری `DB_PATH=/data/ardian.db`, `BACKUP_EVERY_HOURS`, `BACKUP_KEEP`).
-4. تو BotFather: `/setprivacy` → **Disable** (تا بات پیام‌های گروه رو ببینه).
-بات long-polling استفاده می‌کنه؛ پورت یا دامنه لازم نیست. هر ۶ ساعت یه بکاپ (`VACUUM INTO`) تو `/data/backups` ساخته و برای ادمین تو تلگرام فرستاده می‌شه.
+2. Variables: `BOT_TOKEN`، `ADMIN_ID`، `DATABASE_URL` (Supabase). *(اگه SQLite می‌خوای: یه Volume روی `/data` مانت کن و `DATABASE_URL` رو نذار.)*
+3. تو BotFather: `/setprivacy` ← **Disable** (تا بات پیام‌های گروه رو ببینه).
+4. قبل از اولین دیپلوی یک بار `go mod tidy` بزن و `go.sum` رو کامیت کن.
+بات long-polling استفاده می‌کنه؛ پورت یا دامنه لازم نیست. تو لاگ باید `database: PostgreSQL` و `bot @... started` ببینی.
 
 ## ساختار
 | مسیر | کار |
 |---|---|
 | `internal/game` | منطق خالص بازی: استت‌ها، ۸۰ ابیلیتی عنصری، نژادها، موتور نبرد، تست‌ها |
-| `internal/store` | SQLite (database/sql) + بکاپ |
+| `internal/store` | SQLite و Postgres (database/sql، یک بار نوشتن کوئری) + migration + بکاپ SQLite |
 | `internal/tg` | کلاینت Bot API بدون وابستگی |
 | `internal/bot` | /start، ساخت کارکتر، منوها، استت، تواناییها، حمله با ریپلای، ادمین |
 | `cmd/ardian` | main |
@@ -63,3 +78,10 @@ go test ./... && go run ./cmd/ardian
 - **شینگو (گرگ)**: استک با ضربه‌های موفقِ خودش؛ دمیج = استک×درصد روی همهٔ حمله‌ها.
 - **ردیف دکمه‌های استت**: ترتیب «صفر | نام | +۱ | −۱ | +۱۰» راست‌به‌چپ خونده شده.
 - رنگ دکمه‌ها از فیلد `style` تلگرام (primary/success/danger) استفاده می‌کنه؛ اگه کلاینت نشناسه نادیده می‌گیره.
+
+## مصرف منابع (برای پلن‌های رایگان)
+- متن‌ها و عکس‌های منو فقط یک‌بار از دیتابیس خونده می‌شن و کش می‌شن (با `/settext` و `/setphoto` کش پاک می‌شه).
+- بازیکن‌هایی که ۱ ساعت فعالیت نداشتن از حافظه حذف می‌شن (همه‌چیز قبلاً ذخیره شده؛ دفعهٔ بعد از دیتابیس برمی‌گرده).
+- اتصال به Postgres حداکثر ۲ تا، با بستن خودکار اتصال‌های بیکار.
+- Go با `GOMAXPROCS=1 GOGC=50 GOMEMLIMIT=100MiB` اجرا می‌شه (رم کم).
+- نکته: پروژهٔ رایگان Supabase بعد از چند روز بی‌استفاده‌بودن ممکنه pause بشه؛ چون بات هر چند ثانیه به دیتابیس سر می‌زنه معمولاً مشکلی نیست.
