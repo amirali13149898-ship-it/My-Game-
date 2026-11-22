@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"html"
+	"image"
 	"log"
 	"os"
 	"path/filepath"
@@ -42,6 +43,8 @@ type Bot struct {
 	textCache   map[string]string   // texts are read from the DB once
 	photoCache  map[string]photoRow // picture lookups are read from the DB once
 	lastGC      time.Time
+	cardBase    image.Image
+	cardCache   map[string][]byte
 	dungeons    map[int64]*game.DungeonRun
 	lastDungeon map[int64]time.Time
 }
@@ -51,7 +54,7 @@ func New(cfg Config, db *store.DB) *Bot {
 		cfg: cfg, tg: tg.New(cfg.Token), db: db, eng: game.NewEngine(), now: time.Now,
 		cache: map[int64]*game.Fighter{}, drafts: map[int64]*[game.NumStats]int{},
 		lastBtn: map[int64]time.Time{}, lastHunt: map[int64]time.Time{}, awaiting: map[int64]string{},
-		assets: map[string]asset{}, seen: map[int64]time.Time{}, textCache: map[string]string{}, photoCache: map[string]photoRow{}, dungeons: map[int64]*game.DungeonRun{}, lastDungeon: map[int64]time.Time{},
+		assets: map[string]asset{}, seen: map[int64]time.Time{}, textCache: map[string]string{}, cardCache: map[string][]byte{}, photoCache: map[string]photoRow{}, dungeons: map[int64]*game.DungeonRun{}, lastDungeon: map[int64]time.Time{},
 	}
 }
 
@@ -63,6 +66,7 @@ func (b *Bot) Run(ctx context.Context) error {
 	}
 	log.Printf("bot @%s started", b.tg.Me.Username)
 	b.loadAssets()
+	b.loadCardBase()
 	go b.backupLoop(ctx)
 	offset := 0
 	for ctx.Err() == nil {
@@ -249,8 +253,9 @@ type view struct {
 	kb    tg.Keyboard
 	toast string
 	alert bool
-	keep  bool   // only answer the callback, do not touch the message
-	photo string // picture key (optional)
+	keep  bool      // only answer the callback, do not touch the message
+	photo string    // picture key (optional)
+	card  *cardData // numbers drawn on the stats base picture (optional)
 }
 
 func (b *Bot) onCallback(cb *tg.CallbackQuery) {

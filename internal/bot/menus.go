@@ -118,7 +118,12 @@ func (b *Bot) viewStats(f *game.Fighter) view {
 			Data: "st:buy",
 		}})
 	}
-	return view{text: sb.String(), kb: append(kb, backMain)}
+	v := view{text: sb.String(), kb: append(kb, backMain)}
+	v.card = &cardData{Name: f.Name, Level: f.Level, Gold: f.Gold, HP: f.HP, MaxHP: f.MaxHP(), Mana: f.Mana, MaxMana: f.MaxMana()}
+	if !asciiName(f.Name) { // Persian names cannot be drawn on the picture: show it in the caption
+		v.text = "👤 <b>" + esc(f.Name) + "</b>\n" + v.text
+	}
+	return v
 }
 
 func (b *Bot) cbStats(u *tg.User, p []string) view {

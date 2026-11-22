@@ -58,6 +58,9 @@ func (b *Bot) loadAssets() {
 		files, _ := filepath.Glob(filepath.Join(b.cfg.AssetsDir, "*."+ext))
 		for _, f := range files {
 			key := strings.TrimSuffix(filepath.Base(f), filepath.Ext(f))
+			if strings.HasPrefix(key, "card_") { // base pictures for drawn cards, loaded separately
+				continue
+			}
 			if !validPhotoKey(key) {
 				log.Printf("assets: ignoring %s (unknown key; valid: %s)", f, strings.Join(photoKeys, ", "))
 				continue
@@ -101,6 +104,13 @@ func (b *Bot) photoRef(key string) (fileID, path string) {
 
 // sendView sends a new message for a view (photo + caption when available).
 func (b *Bot) sendView(chat int64, v view) {
+	if img := b.cardImage(v.card); img != nil && captionFits(v.text) {
+		if _, err := b.tg.SendPhotoBytes(chat, img, v.text, v.kb); err == nil {
+			return
+		} else {
+			log.Printf("sendPhoto card: %v (falling back)", err)
+		}
+	}
 	if fid, path := b.photoRef(v.photo); (fid != "" || path != "") && captionFits(v.text) {
 		msg, err := b.tg.SendPhoto(chat, fid, path, v.text, v.kb)
 		if err == nil {
@@ -128,6 +138,19 @@ func (b *Bot) rememberUpload(key string, msg *tg.Message) {
 // message and deletes the old one.
 func (b *Bot) present(old *tg.Message, v view) {
 	chat := old.Chat.ID
+	if img := b.cardImage(v.card); img != nil && captionFits(v.text) {
+		if len(old.Photo) > 0 {
+			if err := b.tg.EditPhotoBytes(chat, old.MessageID, img, v.text, v.kb); err != nil {
+				log.Printf("present card: %v", err)
+			}
+			return
+		}
+		b.sendView(chat, v)
+		if derr := b.tg.Delete(chat, old.MessageID); derr != nil {
+			log.Printf("delete: %v", derr)
+		}
+		return
+	}
 	fid, path := b.photoRef(v.photo)
 	wantPhoto := (fid != "" || path != "") && captionFits(v.text)
 	hasPhoto := len(old.Photo) > 0
