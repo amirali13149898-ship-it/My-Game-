@@ -298,3 +298,51 @@ func (c *Client) EditPhoto(chatID int64, msgID int, fileID, caption string, kb K
 func (c *Client) Delete(chatID int64, msgID int) error {
 	return c.Call("deleteMessage", map[string]any{"chat_id": chatID, "message_id": msgID}, nil)
 }
+
+// SendPhotoBytes uploads a freshly generated JPEG.
+func (c *Client) SendPhotoBytes(chatID int64, data []byte, caption string, kb Keyboard) (*Message, error) {
+	var msg Message
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	w.WriteField("chat_id", fmt.Sprint(chatID))
+	w.WriteField("caption", caption)
+	w.WriteField("parse_mode", "HTML")
+	if m := kb.markup(); m != nil {
+		j, _ := json.Marshal(m)
+		w.WriteField("reply_markup", string(j))
+	}
+	part, err := w.CreateFormFile("photo", "card.jpg")
+	if err != nil {
+		return nil, err
+	}
+	part.Write(data)
+	w.Close()
+	return &msg, c.do("sendPhoto", &buf, w.FormDataContentType(), &msg)
+}
+
+// EditPhotoBytes replaces the picture of a photo message with a generated JPEG.
+func (c *Client) EditPhotoBytes(chatID int64, msgID int, data []byte, caption string, kb Keyboard) error {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	w.WriteField("chat_id", fmt.Sprint(chatID))
+	w.WriteField("message_id", fmt.Sprint(msgID))
+	media, _ := json.Marshal(map[string]any{"type": "photo", "media": "attach://card", "caption": caption, "parse_mode": "HTML"})
+	w.WriteField("media", string(media))
+	markup := map[string]any{"inline_keyboard": kb}
+	if len(kb) == 0 {
+		markup = map[string]any{"inline_keyboard": [][]Button{}}
+	}
+	j, _ := json.Marshal(markup)
+	w.WriteField("reply_markup", string(j))
+	part, err := w.CreateFormFile("card", "card.jpg")
+	if err != nil {
+		return err
+	}
+	part.Write(data)
+	w.Close()
+	err = c.do("editMessageMedia", &buf, w.FormDataContentType(), nil)
+	if NotModified(err) {
+		return nil
+	}
+	return err
+}
