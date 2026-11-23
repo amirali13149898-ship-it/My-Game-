@@ -304,11 +304,8 @@ func (f *Fighter) RemainingCD(key string, now time.Time) float64 {
 	return 0
 }
 
-// ResetCost is the gold price of respeccing: the first reset is free.
+// ResetCost is the gold price of respeccing (no free reset).
 func (f *Fighter) ResetCost() int64 {
-	if f.Resets == 0 {
-		return 0
-	}
 	return int64(100 * f.Level)
 }
 

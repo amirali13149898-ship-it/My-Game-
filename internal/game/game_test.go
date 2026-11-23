@@ -346,8 +346,12 @@ func TestDeathPenaltyAndReset(t *testing.T) {
 		t.Fatalf("empty reset: %v", err)
 	}
 	g.Alloc[StatPower], g.Points = 5, 0
-	if err := g.ResetStats(); err != nil || g.Points != 5 || g.Alloc[StatPower] != 0 || g.Resets != 1 {
-		t.Fatalf("free first reset: %v %+v", err, g)
+	if err := g.ResetStats(); err != ErrNoGold {
+		t.Fatalf("reset must not be free: %v", err)
+	}
+	g.Gold = 100 // level 1 costs 100
+	if err := g.ResetStats(); err != nil || g.Points != 5 || g.Alloc[StatPower] != 0 || g.Resets != 1 || g.Gold != 0 {
+		t.Fatalf("reset: %v %+v", err, g)
 	}
 	g.Alloc[StatPower], g.Points, g.Level = 5, 0, 7
 	if err := g.ResetStats(); err != ErrNoGold {
