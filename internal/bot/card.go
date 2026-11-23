@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // The stats card is a base picture (ASSETS_DIR/card_stats.jpg) with numbers
@@ -135,6 +136,18 @@ func (c cardData) key() string {
 	return fmt.Sprintf("%s|%d|%d|%.0f|%.0f|%.0f|%.0f", c.Name, c.Level, c.Gold, c.HP, c.MaxHP, c.Mana, c.MaxMana)
 }
 
+// cardName keeps only the printable ASCII part of a name (decorations and
+// Persian letters cannot be drawn), e.g. "꧁ MADARA ꧂" → "MADARA".
+func cardName(s string) string {
+	var sb strings.Builder
+	for _, r := range s {
+		if r >= 32 && r < 127 {
+			sb.WriteRune(r)
+		}
+	}
+	return strings.Join(strings.Fields(sb.String()), " ")
+}
+
 // asciiName reports whether the name can be drawn with the built-in glyphs.
 func asciiName(s string) bool {
 	if s == "" {
@@ -192,7 +205,7 @@ func drawBar(dst draw.Image, b barBox, cur, max float64, label string) {
 func renderCard(base image.Image, c cardData) ([]byte, error) {
 	rgba := image.NewRGBA(base.Bounds())
 	draw.Draw(rgba, rgba.Bounds(), base, base.Bounds().Min, draw.Src)
-	if asciiName(c.Name) {
+	if c.Name != "" {
 		n := c.Name
 		if fitFont(n, cardLayout.Name.w, 34).width(n) > cardLayout.Name.w {
 			for len(n) > 1 && fitFont(n+"..", cardLayout.Name.w, 34).width(n+"..") > cardLayout.Name.w {

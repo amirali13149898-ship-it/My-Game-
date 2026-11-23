@@ -14,10 +14,11 @@ const huntCooldown = 15 * time.Second
 
 func (b *Bot) viewHunt(f *game.Fighter) view {
 	var sb strings.Builder
-	sb.WriteString("🐗 <b>شکار</b>\n<i>نبرد خودکار با هیولا؛ منبع طلا، XP و آیتم‌های کمیاب (حالت آزمایشی)</i>\n\n")
+	sb.WriteString(header("🐗", "شکار"))
+	sb.WriteString(quote("نبرد خودکار با هیولا؛ منبع طلا، XP و آیتم‌های کمیاب (حالت آزمایشی)") + "\n\n")
 	var kb tg.Keyboard
 	for _, m := range game.MonsterOptions(f.Level) {
-		fmt.Fprintf(&sb, "%s <b>%s</b> — %s · لول %s\n    🎁 ~%s XP · ~%s 🪙 + شانس دراپ\n",
+		fmt.Fprintf(&sb, "%s <b>%s</b> — %s · 🎖 لول %s\n🎁 ~%s XP · ~%s 🪙 + 🍀 شانس دراپ\n\n",
 			game.ElementEmoji[m.Element()], m.Name, game.ArchetypeNames[m.Index], game.FaI(m.Level),
 			game.Fa(m.XPReward()), game.Fa(m.GoldReward()))
 		kb = append(kb, []tg.Button{{Text: "⚔️ " + m.Name, Data: fmt.Sprintf("hu:go:%d:%d", m.Tier, m.Index)}})
@@ -64,20 +65,21 @@ func (b *Bot) cbHunt(u *tg.User, p []string) view {
 
 func huntText(f *game.Fighter, hr *game.HuntResult) string {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "🐗 <b>%s</b> (لول %s) — ⏱ %s\n", hr.Spec.Name, game.FaI(hr.Spec.Level), fmtDur(float64(hr.Seconds)))
+	sb.WriteString(header("🐗", "نتیجهٔ شکار"))
+	fmt.Fprintf(&sb, "\n🐗 <b>%s</b> (لول %s) — ⏱ %s\n\n", hr.Spec.Name, game.FaI(hr.Spec.Level), fmtDur(float64(hr.Seconds)))
 	switch {
 	case hr.Win:
-		sb.WriteString("✅ <b>پیروز شدی!</b>\n")
+		sb.WriteString("🏆 <b>پیروز شدی!</b> 🎉\n")
 	case hr.Died:
 		fmt.Fprintf(&sb, "💀 <b>کشته شدی...</b> ۵ دقیقه دیگه برمی‌گردی.\n💸 جریمه: −%s 🪙 · −%s XP\n", game.Fa(hr.LostGold), game.Fa(hr.LostXP))
 	default:
 		sb.WriteString("🏃 زمان تموم شد و هیچ‌کس نبرد رو نبرد.\n")
 	}
-	fmt.Fprintf(&sb, "🩸 دمیج زدی: %s   💔 دمیج خوردی: %s\n%s\n", game.FaI(hr.Dealt), game.FaI(hr.Taken), hpManaLines(f))
+	fmt.Fprintf(&sb, "\n🩸 دمیج زدی: <b>%s</b>   💔 دمیج خوردی: <b>%s</b>\n\n%s\n", game.FaI(hr.Dealt), game.FaI(hr.Taken), hpManaLines(f))
 	if hr.Win {
-		fmt.Fprintf(&sb, "\n🎁 +%s XP · +%s 🪙", game.Fa(hr.XP), game.Fa(hr.Gold))
+		fmt.Fprintf(&sb, "\n🎁 <b>غنیمت:</b> +%s XP · +%s 🪙", game.Fa(hr.XP), game.Fa(hr.Gold))
 		if hr.Levels > 0 {
-			fmt.Fprintf(&sb, "\n🎉 به لول %s رسیدی! (+%s امتیاز استت)", game.FaI(f.Level), game.FaI(hr.Levels*game.PointsPerLevel))
+			fmt.Fprintf(&sb, "\n🎊 <b>لول‌آپ!</b> به لول %s رسیدی! (+%s امتیاز استت)", game.FaI(f.Level), game.FaI(hr.Levels*game.PointsPerLevel))
 		}
 		if it, ok := game.ItemByID(hr.Drop); ok {
 			fmt.Fprintf(&sb, "\n🧰 دراپ: %s", itemLine(it))

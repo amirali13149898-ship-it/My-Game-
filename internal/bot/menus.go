@@ -11,10 +11,6 @@ import (
 
 func fl(v float64) string { return game.FaI(int(v + 0.5)) }
 
-func hpManaLines(f *game.Fighter) string {
-	return fmt.Sprintf("❤️ HP: %s / %s\n💧 مانا: %s / %s", fl(f.HP), fl(f.MaxHP()), fl(f.Mana), fl(f.MaxMana()))
-}
-
 func elemList(f *game.Fighter) string {
 	parts := make([]string, len(f.Elems))
 	for i, e := range f.Elems {
@@ -36,9 +32,16 @@ func (b *Bot) viewMain(f *game.Fighter) view {
 	if f.Dead(b.now()) {
 		status = "\n💀 <b>مُرده‌ای</b> — " + fmtDur(f.DeadUntil.Sub(b.now()).Seconds()) + " تا بازگشت"
 	}
-	t := fmt.Sprintf("🏰 <b>منوی اصلی</b>\n\n%s <b>%s</b> — %s %s\n🔮 %s\n🎖 لول %s   ✨ XP: %s / %s\n%s\n🪙 طلا: %s%s",
-		game.RaceEmoji[f.Race], esc(f.Name), game.RaceNames[f.Race], sexName(f.Female), elemList(f),
-		game.FaI(f.Level), game.Fa(f.XP), game.Fa(game.XPNeeded(f.Level)), hpManaLines(f), game.Fa(f.Gold), status)
+	t := header("🏰", "منوی اصلی") + fmt.Sprintf("\n%s <b>%s</b>\n%s %s · 🔮 %s\n\n",
+		game.RaceEmoji[f.Race], esc(f.Name), game.RaceNames[f.Race], sexName(f.Female), elemList(f))
+	var card *cardData
+	if b.cardBase != nil {
+		// level, gold, HP and mana are drawn on the picture
+		t += xpLine(f) + status
+		card = &cardData{Name: cardName(f.Name), Level: f.Level, Gold: f.Gold, HP: f.HP, MaxHP: f.MaxHP(), Mana: f.Mana, MaxMana: f.MaxMana()}
+	} else {
+		t += fmt.Sprintf("🎖 <b>لول %s</b>\n%s\n\n%s\n\n🪙 <b>طلا:</b> %s%s", game.FaI(f.Level), xpLine(f), hpManaLines(f), game.Fa(f.Gold), status)
+	}
 	kb := tg.Keyboard{
 		{{Text: "📊 استت", Data: "st:view", Style: "success"}, {Text: "✨ تواناییها", Data: "ab:0", Style: "success"}},
 		{{Text: "🎒 تجهیزات", Data: "eq:0", Style: "danger"}, {Text: "🛒 شاپ", Data: "sh:0", Style: "danger"}},
@@ -46,7 +49,7 @@ func (b *Bot) viewMain(f *game.Fighter) view {
 		{{Text: "🏯 دانجن", Data: "dg:0"}, {Text: "🐗 شکار", Data: "hu:0"}},
 		{{Text: "📖 راهنمایی", Data: "go:help"}},
 	}
-	return view{text: t, kb: kb, photo: "main"}
+	return view{text: t, kb: kb, photo: "main", card: card}
 }
 
 var backMain = []tg.Button{{Text: "🔙 بازگشت", Data: "go:main"}}
@@ -74,9 +77,9 @@ func (b *Bot) viewStats(f *game.Fighter) view {
 	d := b.draft(f.ID)
 	used := draftUsed(d)
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "📊 <b>استت‌ها</b>\n\n🎖 لول: %s   ✨ XP: %s / %s\n%s\n🎯 امتیاز استت: <b>%s</b>   🪙 طلا: %s\n\n",
-		game.FaI(f.Level), game.Fa(f.XP), game.Fa(game.XPNeeded(f.Level)), hpManaLines(f),
-		game.FaI(f.Points-used), game.Fa(f.Gold))
+	sb.WriteString(header("📊", "استت‌ها"))
+	fmt.Fprintf(&sb, "\n🎖 <b>لول %s</b>   🪙 %s\n%s\n\n%s\n\n🎯 امتیاز استت: <b>%s</b>\n\n",
+		game.FaI(f.Level), game.Fa(f.Gold), xpLine(f), hpManaLines(f), game.FaI(f.Points-used))
 	for s := game.Stat(0); s < game.NumStats; s++ {
 		cur := f.Stat(s)
 		line := fmt.Sprintf("%s %s: %s", game.StatEmoji[s], game.StatNames[s], game.FaI(cur))
@@ -106,10 +109,7 @@ func (b *Bot) viewStats(f *game.Fighter) view {
 		})
 	}
 	if f.SpentPoints() > 0 {
-		cost := "رایگان"
-		if c := f.ResetCost(); c > 0 {
-			cost = game.Fa(c) + " 🪙"
-		}
+		cost := game.Fa(f.ResetCost()) + " 🪙"
 		kb = append(kb, []tg.Button{{Text: "♻️ ریست استت (" + cost + ")", Data: "st:rs"}})
 	}
 	if f.Race == game.Human && f.Level >= game.HumanBuyMinLevel && f.Bought < game.HumanBuyMax {
@@ -118,12 +118,7 @@ func (b *Bot) viewStats(f *game.Fighter) view {
 			Data: "st:buy",
 		}})
 	}
-	v := view{text: sb.String(), kb: append(kb, backMain)}
-	v.card = &cardData{Name: f.Name, Level: f.Level, Gold: f.Gold, HP: f.HP, MaxHP: f.MaxHP(), Mana: f.Mana, MaxMana: f.MaxMana()}
-	if !asciiName(f.Name) { // Persian names cannot be drawn on the picture: show it in the caption
-		v.text = "👤 <b>" + esc(f.Name) + "</b>\n" + v.text
-	}
-	return v
+	return view{text: sb.String(), kb: append(kb, backMain)}
 }
 
 func (b *Bot) cbStats(u *tg.User, p []string) view {
@@ -191,10 +186,7 @@ func (b *Bot) cbStats(u *tg.User, p []string) view {
 		if f.SpentPoints() == 0 {
 			return view{toast: "امتیازی خرج نکرده‌ای", keep: true}
 		}
-		cost := "رایگانه (بار اول)"
-		if c := f.ResetCost(); c > 0 {
-			cost = "هزینه: " + game.Fa(c) + " 🪙"
-		}
+		cost := "هزینه: " + game.Fa(f.ResetCost()) + " 🪙"
 		return view{text: fmt.Sprintf("♻️ <b>ریست استت</b>\n\nهمهٔ %s امتیاز خرج‌شده برمی‌گرده تا دوباره پخشش کنی. %s",
 			game.FaI(f.SpentPoints()), cost), kb: tg.Keyboard{
 			{{Text: "✅ ریست کن", Data: "st:rs2", Style: "success"}, {Text: "❌ لغو", Data: "st:view", Style: "danger"}}}}

@@ -122,22 +122,22 @@ func attackText(att, def *game.Fighter, r *game.Result) string {
 	var sb strings.Builder
 	a, d := "<b>"+esc(att.Name)+"</b>", "<b>"+esc(def.Name)+"</b>"
 	if r.Ab == nil {
-		fmt.Fprintf(&sb, "⚔️ %s به %s حمله کرد!\n", a, d)
+		fmt.Fprintf(&sb, "⚔️ %s به %s حمله کرد!\n\n", a, d)
 	} else {
-		fmt.Fprintf(&sb, "%s %s با <b>%s</b> (ارتقا %s) به %s زد!\n", game.ElementEmoji[r.Ab.Element], a, r.Ab.Name,
+		fmt.Fprintf(&sb, "%s %s با <b>%s</b> (ارتقا %s) به %s زد!\n\n", game.ElementEmoji[r.Ab.Element], a, r.Ab.Name,
 			game.FaI(att.SpellLevel(r.Ab)), d)
 	}
 	if r.Dodge {
 		fmt.Fprintf(&sb, "💨 %s جاخالی داد!", d)
 	} else {
 		if r.Crit {
-			sb.WriteString("💥 <b>کریتیکال!</b>\n")
+			sb.WriteString("💥💥 <b>ضربهٔ کریتیکال!</b> 💥💥\n")
 		}
-		fmt.Fprintf(&sb, "🩸 دمیج: <b>%s</b>", game.FaI(r.Damage))
+		fmt.Fprintf(&sb, "🩸 دمیج: <b>%s</b> 🔥", game.FaI(r.Damage))
 		if r.ElemMod != 0 {
 			fmt.Fprintf(&sb, "  🔄 چرخهٔ عنصری: %s", signed(r.ElemMod))
 		}
-		fmt.Fprintf(&sb, "\n❤️ %s: %s", d, hpOf(def))
+		fmt.Fprintf(&sb, "\n❤️ %s  %s  %s", d, bar(def.HP, def.MaxHP(), 6, "🟥"), hpOf(def))
 		if r.Reflected > 0 {
 			fmt.Fprintf(&sb, "\n🪞 %s دمیج به %s برگشت (❤️ %s)", game.FaI(r.Reflected), a, hpOf(att))
 		}
@@ -147,7 +147,7 @@ func attackText(att, def *game.Fighter, r *game.Result) string {
 	}
 	switch {
 	case r.Killed:
-		fmt.Fprintf(&sb, "\n☠️ %s کشته شد! ۵ دقیقه دیگه برمی‌گرده.%s", d, penaltyText(r))
+		fmt.Fprintf(&sb, "\n\n☠️ <b>%s کشته شد!</b> ۵ دقیقه دیگه برمی‌گرده.%s", d, penaltyText(r))
 	case r.AttackerDied:
 		fmt.Fprintf(&sb, "\n☠️ %s با بازتاب دمیج مُرد!%s", a, penaltyText(r))
 	}

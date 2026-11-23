@@ -51,3 +51,12 @@ func TestCardKeyAndCompact(t *testing.T) {
 	}
 }
 func bytesReader(b []byte) *bytes.Reader { return bytes.NewReader(b) }
+
+func TestCardNameStripsDecorations(t *testing.T) {
+	if got := cardName("꧁ MADARA UCHIHA ꧂"); got != "MADARA UCHIHA" {
+		t.Fatalf("got %q", got)
+	}
+	if cardName("علی") != "" {
+		t.Fatal("persian-only name must be empty")
+	}
+}
